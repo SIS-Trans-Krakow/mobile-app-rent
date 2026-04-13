@@ -1,0 +1,122 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "back": "Back",
+    "next": "Next",
+    "submit": "Submit",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "required": "Required field",
+    "ok": "OK",
+    "yes": "Yes",
+    "no": "No",
+    "noData": "No data",
+    "search": "Search...",
+    "language": "Language",
+    "settings": "Settings"
+  },
+  "auth": {
+    "login": "Login",
+    "username": "Username",
+    "password": "Password",
+    "loginButton": "Sign In",
+    "logout": "Logout",
+    "invalidCredentials": "Invalid credentials",
+    "welcome": "Welcome"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "handovers": "Handovers",
+    "returns": "Returns",
+    "admin": "Administration"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "newHandover": "New Handover",
+    "returnTrailer": "Return Trailer",
+    "activeHandovers": "Active Handovers",
+    "allHandovers": "All Handovers"
+  },
+  "handover": {
+    "new": "New Handover",
+    "detail": "Handover Details",
+    "company": "Company",
+    "companyName": "Company Name",
+    "companyAddress": "Address",
+    "companyPhone": "Phone",
+    "companyEmail": "E-mail",
+    "companyContact": "Contact Person",
+    "trailer": "Trailer",
+    "registrationNumber": "Registration Number",
+    "vin": "VIN",
+    "brand": "Brand",
+    "trailerType": "Trailer Type",
+    "equipment": "Equipment",
+    "equipmentNotes": "Equipment description",
+    "date": "Handover Date",
+    "time": "Handover Time",
+    "photos": "Photos",
+    "addPhotos": "Add Photos",
+    "generatePdf": "Generate PDF",
+    "status": "Status",
+    "active": "Active",
+    "returned": "Returned",
+    "created": "Handover created",
+    "selectExisting": "Select existing",
+    "createNew": "Create new"
+  },
+  "trailer": {
+    "types": {
+      "Kurtyna": "Curtain",
+      "Box": "Box",
+      "Izoterma": "Isotherm",
+      "Chłodnia": "Refrigerated"
+    }
+  },
+  "photos": {
+    "front": "Front",
+    "rear": "Rear",
+    "leftSide": "Left Side",
+    "rightSide": "Right Side",
+    "top": "Top",
+    "interior": "Interior",
+    "frontLeft": "Front-Left",
+    "frontRight": "Front-Right",
+    "rearLeft": "Rear-Left",
+    "rearRight": "Rear-Right",
+    "takePhoto": "Take Photo",
+    "pickFromGallery": "Pick from Gallery",
+    "description": "Photo description",
+    "tapZone": "Tap a zone on the template to add a photo"
+  },
+  "return": {
+    "title": "Return Trailer",
+    "selectHandover": "Select handover to return",
+    "date": "Return Date",
+    "time": "Return Time",
+    "notes": "Return notes",
+    "issueFound": "Issue found",
+    "issueDescription": "Issue description",
+    "noIssues": "No issues found",
+    "generateReport": "Generate Report",
+    "comparison": "Comparison",
+    "original": "Handover",
+    "current": "Return",
+    "created": "Return registered"
+  },
+  "admin": {
+    "users": "Users",
+    "createUser": "Create User",
+    "fullName": "Full Name",
+    "role": "Role",
+    "roleAdmin": "Admin",
+    "roleUser": "User",
+    "active": "Active",
+    "inactive": "Inactive",
+    "userCreated": "User created"
+  }
+}

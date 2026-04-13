@@ -1,0 +1,122 @@
+{
+  "common": {
+    "save": "Zapisz",
+    "cancel": "Anuluj",
+    "delete": "Usuń",
+    "edit": "Edytuj",
+    "back": "Wstecz",
+    "next": "Dalej",
+    "submit": "Zatwierdź",
+    "loading": "Ładowanie...",
+    "error": "Błąd",
+    "success": "Sukces",
+    "required": "Pole wymagane",
+    "ok": "OK",
+    "yes": "Tak",
+    "no": "Nie",
+    "noData": "Brak danych",
+    "search": "Szukaj...",
+    "language": "Język",
+    "settings": "Ustawienia"
+  },
+  "auth": {
+    "login": "Logowanie",
+    "username": "Nazwa użytkownika",
+    "password": "Hasło",
+    "loginButton": "Zaloguj się",
+    "logout": "Wyloguj",
+    "invalidCredentials": "Nieprawidłowe dane logowania",
+    "welcome": "Witaj"
+  },
+  "nav": {
+    "dashboard": "Pulpit",
+    "handovers": "Przekazania",
+    "returns": "Zwroty",
+    "admin": "Administracja"
+  },
+  "dashboard": {
+    "title": "Pulpit",
+    "newHandover": "Nowe przekazanie",
+    "returnTrailer": "Zwrot naczepy",
+    "activeHandovers": "Aktywne przekazania",
+    "allHandovers": "Wszystkie przekazania"
+  },
+  "handover": {
+    "new": "Nowe przekazanie",
+    "detail": "Szczegóły przekazania",
+    "company": "Firma",
+    "companyName": "Nazwa firmy",
+    "companyAddress": "Adres",
+    "companyPhone": "Telefon",
+    "companyEmail": "E-mail",
+    "companyContact": "Osoba kontaktowa",
+    "trailer": "Naczepa",
+    "registrationNumber": "Numer rejestracyjny",
+    "vin": "VIN",
+    "brand": "Marka",
+    "trailerType": "Typ naczepy",
+    "equipment": "Wyposażenie",
+    "equipmentNotes": "Opis wyposażenia naczepy",
+    "date": "Data przekazania",
+    "time": "Godzina przekazania",
+    "photos": "Zdjęcia",
+    "addPhotos": "Dodaj zdjęcia",
+    "generatePdf": "Generuj PDF",
+    "status": "Status",
+    "active": "Aktywne",
+    "returned": "Zwrócone",
+    "created": "Przekazanie utworzone",
+    "selectExisting": "Wybierz istniejącą",
+    "createNew": "Utwórz nową"
+  },
+  "trailer": {
+    "types": {
+      "Kurtyna": "Kurtyna",
+      "Box": "Box",
+      "Izoterma": "Izoterma",
+      "Chłodnia": "Chłodnia"
+    }
+  },
+  "photos": {
+    "front": "Przód",
+    "rear": "Tył",
+    "leftSide": "Lewa strona",
+    "rightSide": "Prawa strona",
+    "top": "Góra",
+    "interior": "Wnętrze",
+    "frontLeft": "Przód-lewo",
+    "frontRight": "Przód-prawo",
+    "rearLeft": "Tył-lewo",
+    "rearRight": "Tył-prawo",
+    "takePhoto": "Zrób zdjęcie",
+    "pickFromGallery": "Wybierz z galerii",
+    "description": "Opis zdjęcia",
+    "tapZone": "Dotknij strefę na szablonie aby dodać zdjęcie"
+  },
+  "return": {
+    "title": "Zwrot naczepy",
+    "selectHandover": "Wybierz przekazanie do zwrotu",
+    "date": "Data zwrotu",
+    "time": "Godzina zwrotu",
+    "notes": "Uwagi do zwrotu",
+    "issueFound": "Stwierdzono nieprawidłowość",
+    "issueDescription": "Opis nieprawidłowości",
+    "noIssues": "Brak nieprawidłowości",
+    "generateReport": "Generuj raport",
+    "comparison": "Porównanie",
+    "original": "Przekazanie",
+    "current": "Zwrot",
+    "created": "Zwrot zarejestrowany"
+  },
+  "admin": {
+    "users": "Użytkownicy",
+    "createUser": "Utwórz użytkownika",
+    "fullName": "Imię i nazwisko",
+    "role": "Rola",
+    "roleAdmin": "Administrator",
+    "roleUser": "Użytkownik",
+    "active": "Aktywny",
+    "inactive": "Nieaktywny",
+    "userCreated": "Użytkownik utworzony"
+  }
+}

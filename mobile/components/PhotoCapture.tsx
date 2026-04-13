@@ -1,0 +1,264 @@
+import React, { useState } from 'react';
+import {
+  View, Text, TextInput, TouchableOpacity, Image, StyleSheet,
+  Modal, Alert, Switch,
+} from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { useTranslation } from 'react-i18next';
+import { Ionicons } from '@expo/vector-icons';
+import { Colors, Spacing, FontSize, BorderRadius } from '../constants/theme';
+import { PhotoPosition, ZonePhoto } from './TrailerTemplate';
+
+const POSITION_LABELS: Record<PhotoPosition, string> = {
+  'front': 'photos.front',
+  'rear': 'photos.rear',
+  'left-side': 'photos.leftSide',
+  'right-side': 'photos.rightSide',
+  'top': 'photos.top',
+  'interior': 'photos.interior',
+  'front-left': 'photos.frontLeft',
+  'front-right': 'photos.frontRight',
+  'rear-left': 'photos.rearLeft',
+  'rear-right': 'photos.rearRight',
+};
+
+interface Props {
+  position: PhotoPosition;
+  visible: boolean;
+  onClose: () => void;
+  onSave: (photo: ZonePhoto) => void;
+  existingPhoto?: ZonePhoto;
+  showIssueFields?: boolean;
+  originalPhoto?: ZonePhoto;
+}
+
+export default function PhotoCapture({
+  position, visible, onClose, onSave, existingPhoto, showIssueFields, originalPhoto,
+}: Props) {
+  const { t } = useTranslation();
+  const [uri, setUri] = useState(existingPhoto?.uri || '');
+  const [description, setDescription] = useState(existingPhoto?.description || '');
+  const [hasIssue, setHasIssue] = useState(existingPhoto?.hasIssue || false);
+  const [issueDescription, setIssueDescription] = useState(existingPhoto?.issueDescription || '');
+
+  const takePhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(t('common.error'), 'Camera permission required');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      quality: 0.8,
+      allowsEditing: false,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setUri(result.assets[0].uri);
+    }
+  };
+
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      quality: 0.8,
+      allowsEditing: false,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setUri(result.assets[0].uri);
+    }
+  };
+
+  const handleSave = () => {
+    if (!uri) {
+      Alert.alert(t('common.error'), t('photos.takePhoto'));
+      return;
+    }
+    onSave({
+      uri,
+      position,
+      description,
+      hasIssue: showIssueFields ? hasIssue : undefined,
+      issueDescription: showIssueFields && hasIssue ? issueDescription : undefined,
+    });
+    onClose();
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={onClose}>
+            <Ionicons name="close" size={28} color={Colors.text} />
+          </TouchableOpacity>
+          <Text style={styles.title}>{t(POSITION_LABELS[position])}</Text>
+          <TouchableOpacity onPress={handleSave}>
+            <Text style={styles.saveText}>{t('common.save')}</Text>
+          </TouchableOpacity>
+        </View>
+
+        {originalPhoto && (
+          <View style={styles.originalSection}>
+            <Text style={styles.sectionLabel}>{t('return.original')}:</Text>
+            <Image source={{ uri: originalPhoto.uri }} style={styles.originalImage} />
+            {originalPhoto.description ? (
+              <Text style={styles.originalDesc}>{originalPhoto.description}</Text>
+            ) : null}
+          </View>
+        )}
+
+        <View style={styles.photoSection}>
+          {uri ? (
+            <Image source={{ uri }} style={styles.preview} />
+          ) : (
+            <View style={styles.placeholder}>
+              <Ionicons name="camera" size={48} color={Colors.gray400} />
+            </View>
+          )}
+        </View>
+
+        <View style={styles.actions}>
+          <TouchableOpacity style={styles.actionBtn} onPress={takePhoto}>
+            <Ionicons name="camera" size={22} color={Colors.white} />
+            <Text style={styles.actionText}>{t('photos.takePhoto')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.actionBtn, { backgroundColor: Colors.secondary }]} onPress={pickImage}>
+            <Ionicons name="images" size={22} color={Colors.white} />
+            <Text style={styles.actionText}>{t('photos.pickFromGallery')}</Text>
+          </TouchableOpacity>
+        </View>
+
+        <TextInput
+          style={styles.input}
+          placeholder={t('photos.description')}
+          placeholderTextColor={Colors.gray400}
+          value={description}
+          onChangeText={setDescription}
+          multiline
+        />
+
+        {showIssueFields && (
+          <View style={styles.issueSection}>
+            <View style={styles.issueToggle}>
+              <Text style={styles.issueLabel}>{t('return.issueFound')}</Text>
+              <Switch
+                value={hasIssue}
+                onValueChange={setHasIssue}
+                trackColor={{ true: Colors.danger }}
+              />
+            </View>
+            {hasIssue && (
+              <TextInput
+                style={[styles.input, styles.issueInput]}
+                placeholder={t('return.issueDescription')}
+                placeholderTextColor={Colors.gray400}
+                value={issueDescription}
+                onChangeText={setIssueDescription}
+                multiline
+              />
+            )}
+          </View>
+        )}
+      </View>
+    </Modal>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: Colors.background },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    backgroundColor: Colors.white,
+    paddingTop: Spacing.xl,
+  },
+  title: { fontSize: FontSize.lg, fontWeight: '600', color: Colors.text },
+  saveText: { fontSize: FontSize.md, fontWeight: '600', color: Colors.primary },
+  originalSection: {
+    padding: Spacing.md,
+    backgroundColor: Colors.gray100,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  sectionLabel: {
+    fontSize: FontSize.sm,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+    marginBottom: Spacing.xs,
+  },
+  originalImage: {
+    width: '100%',
+    height: 120,
+    borderRadius: BorderRadius.sm,
+    resizeMode: 'cover',
+  },
+  originalDesc: {
+    fontSize: FontSize.xs,
+    color: Colors.textSecondary,
+    marginTop: Spacing.xs,
+  },
+  photoSection: { alignItems: 'center', padding: Spacing.md },
+  preview: {
+    width: '100%',
+    height: 220,
+    borderRadius: BorderRadius.md,
+    resizeMode: 'cover',
+  },
+  placeholder: {
+    width: '100%',
+    height: 220,
+    borderRadius: BorderRadius.md,
+    borderWidth: 2,
+    borderColor: Colors.gray300,
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.gray50,
+  },
+  actions: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.md,
+  },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primary,
+    borderRadius: BorderRadius.sm,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    gap: Spacing.xs,
+  },
+  actionText: { color: Colors.white, fontSize: FontSize.sm, fontWeight: '600' },
+  input: {
+    margin: Spacing.md,
+    padding: Spacing.md,
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.sm,
+    fontSize: FontSize.md,
+    color: Colors.text,
+    minHeight: 60,
+    textAlignVertical: 'top',
+  },
+  issueSection: { paddingHorizontal: Spacing.md },
+  issueToggle: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  issueLabel: { fontSize: FontSize.md, fontWeight: '600', color: Colors.danger },
+  issueInput: {
+    marginHorizontal: 0,
+    marginTop: Spacing.sm,
+    borderColor: Colors.danger,
+  },
+});

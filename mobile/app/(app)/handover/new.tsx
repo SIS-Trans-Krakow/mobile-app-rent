@@ -11,7 +11,7 @@ import { Colors, Spacing, FontSize, BorderRadius } from '../../../constants/them
 import TrailerTemplate, { PhotoPosition, ZonePhoto } from '../../../components/TrailerTemplate';
 import PhotoCapture from '../../../components/PhotoCapture';
 
-const TRAILER_TYPES = ['Kurtyna', 'Box', 'Izoterma', 'Chłodnia'] as const;
+const TRAILER_TYPES = ['Kurtyna', 'Box', 'Izoterma', 'Chłodnia', 'Kurtyna MEGA', 'TANDEM', 'Double Deck'] as const;
 
 export default function NewHandoverScreen() {
   const { t } = useTranslation();

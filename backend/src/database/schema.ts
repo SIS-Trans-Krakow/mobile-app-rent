@@ -3,6 +3,12 @@ import path from 'path';
 
 const DB_PATH = path.join(__dirname, '..', '..', 'data', 'app.db');
 
+export const VALID_TRAILER_TYPES = [
+  'Kurtyna', 'Box', 'Izoterma', 'Chłodnia', 'Kurtyna MEGA', 'TANDEM', 'Double Deck',
+] as const;
+
+const TRAILER_TYPE_CHECK = VALID_TRAILER_TYPES.map((t) => `'${t}'`).join(', ');
+
 let db: Database.Database;
 
 export function getDb(): Database.Database {
@@ -14,10 +20,49 @@ export function getDb(): Database.Database {
     }
     db = new Database(DB_PATH);
     db.pragma('journal_mode = WAL');
+    migrateTrailersTable(db);
     db.pragma('foreign_keys = ON');
     initSchema(db);
   }
   return db;
+}
+
+function migrateTrailersTable(db: Database.Database): void {
+  const tableExists = db.prepare(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='trailers'"
+  ).get();
+
+  if (!tableExists) return;
+
+  const columns = db.prepare('PRAGMA table_info(trailers)').all() as Array<{ name: string }>;
+  const hasProductionDate = columns.some((col) => col.name === 'production_date');
+
+  if (hasProductionDate) return;
+
+  console.log('[db] Migrating trailers table: adding production_date, updating type constraint...');
+  db.pragma('foreign_keys = OFF');
+  db.exec(`
+    BEGIN TRANSACTION;
+
+    CREATE TABLE trailers_new (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      registration_number TEXT NOT NULL,
+      vin TEXT NOT NULL DEFAULT '',
+      brand TEXT NOT NULL DEFAULT '',
+      production_date TEXT NOT NULL DEFAULT '',
+      type TEXT NOT NULL CHECK(type IN (${TRAILER_TYPE_CHECK}))
+    );
+
+    INSERT INTO trailers_new (id, registration_number, vin, brand, type)
+      SELECT id, registration_number, vin, brand, type FROM trailers;
+
+    DROP TABLE trailers;
+
+    ALTER TABLE trailers_new RENAME TO trailers;
+
+    COMMIT;
+  `);
+  console.log('[db] Trailers table migration complete.');
 }
 
 function initSchema(db: Database.Database): void {
@@ -46,7 +91,8 @@ function initSchema(db: Database.Database): void {
       registration_number TEXT NOT NULL,
       vin TEXT NOT NULL DEFAULT '',
       brand TEXT NOT NULL DEFAULT '',
-      type TEXT NOT NULL CHECK(type IN ('Kurtyna', 'Box', 'Izoterma', 'Chłodnia'))
+      production_date TEXT NOT NULL DEFAULT '',
+      type TEXT NOT NULL CHECK(type IN (${TRAILER_TYPE_CHECK}))
     );
 
     CREATE TABLE IF NOT EXISTS handovers (

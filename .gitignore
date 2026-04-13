@@ -8,3 +8,6 @@ backend/uploads/*.png
 *.tsbuildinfo
 .DS_Store
 references
+.env
+.env.local
+.env*.local

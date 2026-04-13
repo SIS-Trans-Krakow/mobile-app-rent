@@ -37,6 +37,7 @@ interface HandoverData {
   vin: string;
   brand: string;
   trailer_type: string;
+  production_date: string;
   created_by_name: string;
   photos: Array<{
     file_path: string;
@@ -169,6 +170,9 @@ export function generateHandoverPdf(data: HandoverData): PDFKit.PDFDocument {
   doc.text(`VIN: ${data.vin}`);
   doc.text(`Marka: ${data.brand}`);
   doc.text(`Typ: ${data.trailer_type}`);
+  if (data.production_date) {
+    doc.text(`Data produkcji: ${data.production_date}`);
+  }
   doc.moveDown(0.8);
 
   if (data.equipment_notes) {

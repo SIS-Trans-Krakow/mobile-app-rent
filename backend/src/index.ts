@@ -1,7 +1,8 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
-import { seedDefaultAdmin } from './database/seed';
+import { seedDefaultAdmin, seedTrailersFromCsv } from './database/seed';
 import authRoutes from './routes/auth';
 import userRoutes from './routes/users';
 import companyRoutes from './routes/companies';
@@ -33,6 +34,7 @@ app.get('/api/health', (_req, res) => {
 
 async function start() {
   await seedDefaultAdmin();
+  seedTrailersFromCsv();
   app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });

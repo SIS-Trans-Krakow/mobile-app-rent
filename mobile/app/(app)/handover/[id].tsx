@@ -199,6 +199,7 @@ export default function HandoverDetailScreen() {
         <Text style={styles.detail}>{t('handover.trailerType')}: {handover.trailer_type}</Text>
         {handover.vin ? <Text style={styles.detail}>VIN: {handover.vin}</Text> : null}
         {handover.brand ? <Text style={styles.detail}>{t('handover.brand')}: {handover.brand}</Text> : null}
+        {handover.production_date ? <Text style={styles.detail}>{t('trailer.productionDate')}: {handover.production_date}</Text> : null}
       </View>
 
       <View style={styles.section}>

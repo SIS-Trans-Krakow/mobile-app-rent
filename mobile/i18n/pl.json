@@ -74,8 +74,12 @@
       "Kurtyna": "Kurtyna",
       "Box": "Box",
       "Izoterma": "Izoterma",
-      "Chłodnia": "Chłodnia"
-    }
+      "Chłodnia": "Chłodnia",
+      "Kurtyna MEGA": "Kurtyna MEGA",
+      "TANDEM": "Tandem",
+      "Double Deck": "Double Deck"
+    },
+    "productionDate": "Data produkcji"
   },
   "photos": {
     "front": "Przód",
@@ -110,6 +114,7 @@
   },
   "admin": {
     "users": "Użytkownicy",
+    "trailers": "Naczepy",
     "createUser": "Utwórz użytkownika",
     "fullName": "Imię i nazwisko",
     "role": "Rola",
@@ -119,6 +124,22 @@
     "inactive": "Nieaktywny",
     "userCreated": "Użytkownik utworzony",
     "userDeleted": "Użytkownik usunięty",
-    "deleteUserConfirm": "Czy na pewno usunąć użytkownika"
+    "deleteUserConfirm": "Czy na pewno usunąć użytkownika",
+    "createTrailer": "Dodaj naczepę",
+    "editTrailer": "Edytuj naczepę",
+    "trailerCreated": "Naczepa dodana",
+    "trailerUpdated": "Naczepa zaktualizowana",
+    "trailerDeleted": "Naczepa usunięta",
+    "deleteTrailerConfirm": "Czy na pewno usunąć naczepę",
+    "cannotDeleteTrailer": "Nie można usunąć naczepy używanej w przekazaniach",
+    "registrationNumber": "Numer rejestracyjny",
+    "vin": "VIN",
+    "brand": "Marka",
+    "trailerType": "Typ naczepy",
+    "productionDate": "Data produkcji",
+    "manageUsers": "Zarządzaj użytkownikami",
+    "manageTrailers": "Zarządzaj naczepami",
+    "manageUsersDesc": "Tworzenie, edycja i usuwanie kont użytkowników",
+    "manageTrailersDesc": "Dodawanie, edycja i usuwanie naczep z bazy"
   }
 }

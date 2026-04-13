@@ -12,6 +12,7 @@ router.get('/handover/:id', (req: Request, res: Response) => {
     SELECT h.*, c.name as company_name, c.address as company_address,
            c.phone as company_phone, c.email as company_email, c.contact_person as company_contact,
            t.registration_number, t.vin, t.brand, t.type as trailer_type,
+           t.production_date,
            u.full_name as created_by_name
     FROM handovers h
     JOIN companies c ON h.company_id = c.id
@@ -62,6 +63,7 @@ router.get('/return/:id', (req: Request, res: Response) => {
     SELECT h.*, c.name as company_name, c.address as company_address,
            c.phone as company_phone, c.email as company_email, c.contact_person as company_contact,
            t.registration_number, t.vin, t.brand, t.type as trailer_type,
+           t.production_date,
            u.full_name as created_by_name
     FROM handovers h
     JOIN companies c ON h.company_id = c.id

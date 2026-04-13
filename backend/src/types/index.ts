@@ -17,13 +17,14 @@ export interface Company {
   contact_person: string;
 }
 
-export type TrailerType = 'Kurtyna' | 'Box' | 'Izoterma' | 'Chłodnia';
+export type TrailerType = 'Kurtyna' | 'Box' | 'Izoterma' | 'Chłodnia' | 'Kurtyna MEGA' | 'TANDEM' | 'Double Deck';
 
 export interface Trailer {
   id: number;
   registration_number: string;
   vin: string;
   brand: string;
+  production_date: string;
   type: TrailerType;
 }
 

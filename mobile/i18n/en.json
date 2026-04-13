@@ -74,8 +74,12 @@
       "Kurtyna": "Curtain",
       "Box": "Box",
       "Izoterma": "Isotherm",
-      "Chłodnia": "Refrigerated"
-    }
+      "Chłodnia": "Refrigerated",
+      "Kurtyna MEGA": "Curtain MEGA",
+      "TANDEM": "Tandem",
+      "Double Deck": "Double Deck"
+    },
+    "productionDate": "Production Date"
   },
   "photos": {
     "front": "Front",
@@ -110,6 +114,7 @@
   },
   "admin": {
     "users": "Users",
+    "trailers": "Trailers",
     "createUser": "Create User",
     "fullName": "Full Name",
     "role": "Role",
@@ -119,6 +124,22 @@
     "inactive": "Inactive",
     "userCreated": "User created",
     "userDeleted": "User deleted",
-    "deleteUserConfirm": "Are you sure you want to delete user"
+    "deleteUserConfirm": "Are you sure you want to delete user",
+    "createTrailer": "Add Trailer",
+    "editTrailer": "Edit Trailer",
+    "trailerCreated": "Trailer added",
+    "trailerUpdated": "Trailer updated",
+    "trailerDeleted": "Trailer deleted",
+    "deleteTrailerConfirm": "Are you sure you want to delete trailer",
+    "cannotDeleteTrailer": "Cannot delete trailer used in handovers",
+    "registrationNumber": "Registration Number",
+    "vin": "VIN",
+    "brand": "Brand",
+    "trailerType": "Trailer Type",
+    "productionDate": "Production Date",
+    "manageUsers": "Manage Users",
+    "manageTrailers": "Manage Trailers",
+    "manageUsersDesc": "Create, edit and delete user accounts",
+    "manageTrailersDesc": "Add, edit and delete trailers from database"
   }
 }

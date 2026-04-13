@@ -35,7 +35,7 @@ router.get('/', (req: Request, res: Response) => {
   const { status } = req.query;
   let query = `
     SELECT h.*, c.name as company_name, t.registration_number, t.type as trailer_type,
-           u.full_name as created_by_name
+           t.production_date, u.full_name as created_by_name
     FROM handovers h
     JOIN companies c ON h.company_id = c.id
     JOIN trailers t ON h.trailer_id = t.id
@@ -57,7 +57,7 @@ router.get('/:id', (req: Request, res: Response) => {
     SELECT h.*, c.name as company_name, c.address as company_address,
            c.phone as company_phone, c.email as company_email, c.contact_person as company_contact,
            t.registration_number, t.vin, t.brand, t.type as trailer_type,
-           u.full_name as created_by_name
+           t.production_date, u.full_name as created_by_name
     FROM handovers h
     JOIN companies c ON h.company_id = c.id
     JOIN trailers t ON h.trailer_id = t.id
@@ -98,7 +98,7 @@ router.post('/', upload.array('photos', 20), (req: Request, res: Response) => {
     const {
       company_name, company_address, company_phone, company_email, company_contact,
       company_id: existingCompanyId,
-      registration_number, vin, brand, trailer_type,
+      registration_number, vin, brand, trailer_type, production_date,
       trailer_id: existingTrailerId,
       handover_date, handover_time, equipment_notes,
       photo_positions, photo_descriptions,
@@ -157,8 +157,8 @@ router.post('/', upload.array('photos', 20), (req: Request, res: Response) => {
         trailerId = existingTrailer.id;
       } else {
         const result = db.prepare(
-          'INSERT INTO trailers (registration_number, vin, brand, type) VALUES (?, ?, ?, ?)'
-        ).run(normalizedRegistration, vin || '', brand || '', trailer_type);
+          'INSERT INTO trailers (registration_number, vin, brand, type, production_date) VALUES (?, ?, ?, ?, ?)'
+        ).run(normalizedRegistration, vin || '', brand || '', trailer_type, production_date || '');
         trailerId = Number(result.lastInsertRowid);
       }
     }

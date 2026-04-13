@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.expo/
+backend/data/
+backend/uploads/*.jpg
+backend/uploads/*.jpeg
+backend/uploads/*.png
+*.tsbuildinfo
+.DS_Store

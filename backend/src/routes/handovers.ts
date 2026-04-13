@@ -1,12 +1,15 @@
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import path from 'path';
+import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { getDb } from '../database/schema';
-import { authenticate } from '../middleware/auth';
+import { authenticate, requireAdmin } from '../middleware/auth';
 
 const router = Router();
 router.use(authenticate);
+
+const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png']);
 
 const storage = multer.diskStorage({
   destination: path.join(__dirname, '..', '..', 'uploads'),
@@ -15,7 +18,17 @@ const storage = multer.diskStorage({
     cb(null, `${uuidv4()}${ext}`);
   },
 });
-const upload = multer({ storage, limits: { fileSize: 20 * 1024 * 1024 } });
+const upload = multer({
+  storage,
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (ALLOWED_MIME_TYPES.has(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Niedozwolony format pliku: ${file.mimetype}. Dozwolone: jpg, jpeg, png`));
+    }
+  },
+});
 
 router.get('/', (req: Request, res: Response) => {
   const db = getDb();
@@ -61,7 +74,22 @@ router.get('/:id', (req: Request, res: Response) => {
     'SELECT * FROM handover_photos WHERE handover_id = ? ORDER BY id'
   ).all(Number(req.params.id));
 
-  res.json({ ...handover, photos });
+  const returnRecord = db.prepare(
+    'SELECT r.*, u.full_name as created_by_name FROM returns r JOIN users u ON r.created_by = u.id WHERE r.handover_id = ?'
+  ).get(Number(req.params.id)) as any | undefined;
+
+  let returnPhotos: any[] = [];
+  if (returnRecord) {
+    returnPhotos = db.prepare(
+      'SELECT * FROM return_photos WHERE return_id = ? ORDER BY id'
+    ).all(returnRecord.id) as any[];
+  }
+
+  res.json({
+    ...handover,
+    photos,
+    return: returnRecord ? { ...returnRecord, photos: returnPhotos } : null,
+  });
 });
 
 router.post('/', upload.array('photos', 20), (req: Request, res: Response) => {
@@ -76,28 +104,63 @@ router.post('/', upload.array('photos', 20), (req: Request, res: Response) => {
       photo_positions, photo_descriptions,
     } = req.body;
 
+    const normalizedCompanyName = (company_name || '').trim();
+    const normalizedCompanyContact = (company_contact || '').trim();
+    const normalizedRegistration = (registration_number || '').trim();
+
     let companyId = existingCompanyId ? Number(existingCompanyId) : null;
     if (!companyId) {
-      if (!company_name) {
+      if (!normalizedCompanyName) {
         res.status(400).json({ error: 'Company name is required' });
         return;
       }
-      const result = db.prepare(
-        'INSERT INTO companies (name, address, phone, email, contact_person) VALUES (?, ?, ?, ?, ?)'
-      ).run(company_name, company_address || '', company_phone || '', company_email || '', company_contact || '');
-      companyId = Number(result.lastInsertRowid);
+
+      const companies = db.prepare(
+        `SELECT id, contact_person
+         FROM companies
+         WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))
+         ORDER BY id DESC`
+      ).all(normalizedCompanyName) as Array<{ id: number; contact_person: string }>;
+
+      if (companies.length > 0) {
+        if (!normalizedCompanyContact) {
+          companyId = companies[0].id;
+        } else {
+          const exactContactMatch = companies.find(
+            (company) => (company.contact_person || '').trim().toLowerCase() === normalizedCompanyContact.toLowerCase()
+          );
+          companyId = exactContactMatch ? exactContactMatch.id : companies[0].id;
+        }
+      } else {
+        const result = db.prepare(
+          'INSERT INTO companies (name, address, phone, email, contact_person) VALUES (?, ?, ?, ?, ?)'
+        ).run(normalizedCompanyName, company_address || '', company_phone || '', company_email || '', company_contact || '');
+        companyId = Number(result.lastInsertRowid);
+      }
     }
 
     let trailerId = existingTrailerId ? Number(existingTrailerId) : null;
     if (!trailerId) {
-      if (!registration_number || !trailer_type) {
+      if (!normalizedRegistration || !trailer_type) {
         res.status(400).json({ error: 'Registration number and trailer type are required' });
         return;
       }
-      const result = db.prepare(
-        'INSERT INTO trailers (registration_number, vin, brand, type) VALUES (?, ?, ?, ?)'
-      ).run(registration_number, vin || '', brand || '', trailer_type);
-      trailerId = Number(result.lastInsertRowid);
+
+      const existingTrailer = db.prepare(
+        `SELECT id
+         FROM trailers
+         WHERE UPPER(TRIM(registration_number)) = UPPER(TRIM(?))
+         LIMIT 1`
+      ).get(normalizedRegistration) as { id: number } | undefined;
+
+      if (existingTrailer) {
+        trailerId = existingTrailer.id;
+      } else {
+        const result = db.prepare(
+          'INSERT INTO trailers (registration_number, vin, brand, type) VALUES (?, ?, ?, ?)'
+        ).run(normalizedRegistration, vin || '', brand || '', trailer_type);
+        trailerId = Number(result.lastInsertRowid);
+      }
     }
 
     const handoverResult = db.prepare(`
@@ -126,6 +189,60 @@ router.post('/', upload.array('photos', 20), (req: Request, res: Response) => {
     res.status(201).json({ id: handoverId, message: 'Handover created' });
   } catch (err) {
     console.error('Create handover error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.delete('/:id', requireAdmin, (req: Request, res: Response) => {
+  try {
+    const db = getDb();
+    const handoverId = Number(req.params.id);
+    if (!Number.isFinite(handoverId)) {
+      res.status(400).json({ error: 'Invalid handover id' });
+      return;
+    }
+
+    const handover = db.prepare('SELECT id FROM handovers WHERE id = ?').get(handoverId);
+    if (!handover) {
+      res.status(404).json({ error: 'Handover not found' });
+      return;
+    }
+
+    const handoverPhotos = db.prepare(
+      'SELECT file_path FROM handover_photos WHERE handover_id = ?'
+    ).all(handoverId) as Array<{ file_path: string }>;
+    const returnPhotos = db.prepare(`
+      SELECT rp.file_path
+      FROM return_photos rp
+      JOIN returns r ON r.id = rp.return_id
+      WHERE r.handover_id = ?
+    `).all(handoverId) as Array<{ file_path: string }>;
+
+    const removeData = db.transaction(() => {
+      db.prepare(
+        `DELETE FROM return_photos
+         WHERE return_id IN (SELECT id FROM returns WHERE handover_id = ?)`
+      ).run(handoverId);
+      db.prepare('DELETE FROM returns WHERE handover_id = ?').run(handoverId);
+      db.prepare('DELETE FROM handover_photos WHERE handover_id = ?').run(handoverId);
+      db.prepare('DELETE FROM handovers WHERE id = ?').run(handoverId);
+    });
+    removeData();
+
+    for (const photo of [...handoverPhotos, ...returnPhotos]) {
+      const filePath = path.join(__dirname, '..', '..', 'uploads', photo.file_path);
+      if (fs.existsSync(filePath)) {
+        try {
+          fs.unlinkSync(filePath);
+        } catch (err) {
+          console.warn('[handovers] Failed to remove photo file:', filePath, err);
+        }
+      }
+    }
+
+    res.json({ message: 'Handover deleted' });
+  } catch (err) {
+    console.error('Delete handover error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

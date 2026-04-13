@@ -10,6 +10,7 @@ import api, { getUploadsUrl, getAccessToken } from '../../../services/api';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../../constants/theme';
 import TrailerTemplate, { PhotoPosition, ZonePhoto, ALL_POSITIONS } from '../../../components/TrailerTemplate';
 import PhotoCapture from '../../../components/PhotoCapture';
+import PhotoLightbox from '../../../components/PhotoLightbox';
 
 const POSITION_LABELS: Record<PhotoPosition, string> = {
   'front': 'photos.front',
@@ -43,6 +44,7 @@ export default function ReturnScreen() {
   const [capturePosition, setCapturePosition] = useState<PhotoPosition | null>(null);
 
   const [originalPhotos, setOriginalPhotos] = useState<Record<string, ZonePhoto | undefined>>({});
+  const [lightboxPhoto, setLightboxPhoto] = useState<{ uri: string; label?: string; description?: string } | null>(null);
 
   useEffect(() => {
     loadHandover();
@@ -78,6 +80,19 @@ export default function ReturnScreen() {
   };
 
   const handleSubmit = async () => {
+    if (submitting) return;
+
+    const requiredPositions = ALL_POSITIONS.filter((pos) => !!originalPhotos[pos]);
+    const missingPositions = requiredPositions.filter((pos) => !returnPhotos[pos]);
+    if (missingPositions.length > 0) {
+      const missingLabels = missingPositions.map((pos) => t(POSITION_LABELS[pos])).join(', ');
+      Alert.alert(
+        t('common.error'),
+        `Brak zdjęć zwrotu dla pozycji: ${missingLabels}`
+      );
+      return;
+    }
+
     setSubmitting(true);
     try {
       const formData = new FormData();
@@ -89,11 +104,14 @@ export default function ReturnScreen() {
       const photoEntries = Object.values(returnPhotos).filter(Boolean) as ZonePhoto[];
       for (const photo of photoEntries) {
         const filename = photo.uri.split('/').pop() || 'photo.jpg';
-        formData.append('photos', {
-          uri: photo.uri,
-          name: filename,
-          type: 'image/jpeg',
-        } as any);
+        if (Platform.OS === 'web') {
+          const response = await fetch(photo.uri);
+          const blob = await response.blob();
+          const file = new File([blob], filename, { type: blob.type || 'image/jpeg' });
+          formData.append('photos', file);
+        } else {
+          formData.append('photos', { uri: photo.uri, name: filename, type: 'image/jpeg' } as any);
+        }
         formData.append('photo_positions', photo.position);
         formData.append('photo_descriptions', photo.description || '');
         formData.append('photo_has_issues', photo.hasIssue ? '1' : '0');
@@ -104,25 +122,37 @@ export default function ReturnScreen() {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      Alert.alert(t('common.success'), t('return.created'), [
-        {
-          text: t('return.generateReport'),
-          onPress: () => {
-            const baseUrl = api.defaults.baseURL?.replace('/api', '');
-            const token = getAccessToken();
-            const url = `${baseUrl}/api/pdf/return/${res.data.id}?token=${token}`;
-            if (Platform.OS === 'web') {
-              window.open(url, '_blank');
-            } else {
+      if (Platform.OS === 'web') {
+        const baseUrl = api.defaults.baseURL?.replace('/api', '');
+        const token = getAccessToken();
+        const reportUrl = `${baseUrl}/api/pdf/return/${res.data.id}?token=${token}`;
+        const generateReport = window.confirm(
+          `${t('return.created')}\n\n${t('return.generateReport')}?`
+        );
+        if (generateReport) window.open(reportUrl, '_blank');
+        router.back();
+      } else {
+        Alert.alert(t('common.success'), t('return.created'), [
+          {
+            text: t('return.generateReport'),
+            onPress: () => {
+              const baseUrl = api.defaults.baseURL?.replace('/api', '');
+              const token = getAccessToken();
+              const url = `${baseUrl}/api/pdf/return/${res.data.id}?token=${token}`;
               Linking.openURL(url);
-            }
-            router.back();
+              router.back();
+            },
           },
-        },
-        { text: t('common.ok'), onPress: () => router.back() },
-      ]);
+          { text: t('common.ok'), onPress: () => router.back() },
+        ]);
+      }
     } catch (err: any) {
-      Alert.alert(t('common.error'), err?.response?.data?.error || 'Error');
+      const errMsg = err?.response?.data?.error || 'Error';
+      if (Platform.OS === 'web') {
+        window.alert(errMsg);
+      } else {
+        Alert.alert(t('common.error'), errMsg);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -145,6 +175,8 @@ export default function ReturnScreen() {
   }
 
   const hasIssues = Object.values(returnPhotos).some((p) => p?.hasIssue);
+  const requiredPositions = ALL_POSITIONS.filter((pos) => !!originalPhotos[pos]);
+  const missingRequiredPositions = requiredPositions.filter((pos) => !returnPhotos[pos]);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -177,6 +209,19 @@ export default function ReturnScreen() {
 
       {/* Comparison: original photos + new photos */}
       <Text style={styles.sectionTitle}>{t('return.comparison')}</Text>
+      {requiredPositions.length > 0 && (
+        <Text style={styles.requiredHint}>
+          Wymagane zdjęcia: {requiredPositions.length}. Dodane: {requiredPositions.length - missingRequiredPositions.length}.
+        </Text>
+      )}
+      {missingRequiredPositions.length > 0 && (
+        <View style={styles.validationBox}>
+          <Text style={styles.validationTitle}>Brakujące zdjęcia:</Text>
+          <Text style={styles.validationText}>
+            {missingRequiredPositions.map((pos) => t(POSITION_LABELS[pos])).join(', ')}
+          </Text>
+        </View>
+      )}
 
       {ALL_POSITIONS.filter(pos => originalPhotos[pos]).map((pos) => {
         const original = originalPhotos[pos];
@@ -189,7 +234,15 @@ export default function ReturnScreen() {
               <View style={styles.comparisonCol}>
                 <Text style={styles.colLabel}>{t('return.original')}</Text>
                 {original ? (
-                  <Image source={{ uri: original.uri }} style={styles.comparisonImg} />
+                  <TouchableOpacity
+                    onPress={() => setLightboxPhoto({ uri: original.uri, label: t(POSITION_LABELS[pos]), description: original.description })}
+                    activeOpacity={0.85}
+                  >
+                    <Image source={{ uri: original.uri }} style={styles.comparisonImg} />
+                    <View style={styles.expandBadge}>
+                      <Ionicons name="expand-outline" size={12} color={Colors.white} />
+                    </View>
+                  </TouchableOpacity>
                 ) : (
                   <View style={styles.noPhoto}>
                     <Text style={styles.noPhotoText}>-</Text>
@@ -207,10 +260,22 @@ export default function ReturnScreen() {
                     styles.comparisonImgContainer,
                     returnPhoto?.hasIssue && styles.issueContainer,
                   ]}
-                  onPress={() => handleZonePress(pos)}
+                  onPress={() => {
+                    if (returnPhoto) {
+                      setLightboxPhoto({ uri: returnPhoto.uri, label: t(POSITION_LABELS[pos]), description: returnPhoto.issueDescription });
+                    } else {
+                      handleZonePress(pos);
+                    }
+                  }}
+                  onLongPress={() => handleZonePress(pos)}
                 >
                   {returnPhoto ? (
-                    <Image source={{ uri: returnPhoto.uri }} style={styles.comparisonImg} />
+                    <>
+                      <Image source={{ uri: returnPhoto.uri }} style={styles.comparisonImg} />
+                      <View style={styles.expandBadge}>
+                        <Ionicons name="expand-outline" size={12} color={Colors.white} />
+                      </View>
+                    </>
                   ) : (
                     <View style={styles.addPhotoBtn}>
                       <Ionicons name="camera" size={24} color={Colors.primary} />
@@ -218,6 +283,12 @@ export default function ReturnScreen() {
                     </View>
                   )}
                 </TouchableOpacity>
+                {returnPhoto && (
+                  <TouchableOpacity onPress={() => handleZonePress(pos)} style={styles.editPhotoLink}>
+                    <Ionicons name="pencil-outline" size={12} color={Colors.primary} />
+                    <Text style={styles.editPhotoText}>Zmień</Text>
+                  </TouchableOpacity>
+                )}
                 {returnPhoto?.hasIssue && (
                   <Text style={styles.issueText}>{returnPhoto.issueDescription}</Text>
                 )}
@@ -236,9 +307,13 @@ export default function ReturnScreen() {
 
       {/* Submit */}
       <TouchableOpacity
-        style={[styles.submitBtn, hasIssues && { backgroundColor: Colors.warning }]}
+        style={[
+          styles.submitBtn,
+          hasIssues && { backgroundColor: Colors.warning },
+          missingRequiredPositions.length > 0 && styles.submitBtnDisabled,
+        ]}
         onPress={handleSubmit}
-        disabled={submitting}
+        disabled={submitting || missingRequiredPositions.length > 0}
       >
         {submitting ? (
           <ActivityIndicator color={Colors.white} />
@@ -246,7 +321,11 @@ export default function ReturnScreen() {
           <>
             <Ionicons name="checkmark-circle" size={22} color={Colors.white} />
             <Text style={styles.submitText}>
-              {hasIssues ? t('return.generateReport') : t('common.submit')}
+              {missingRequiredPositions.length > 0
+                ? 'Uzupełnij brakujące zdjęcia'
+                : hasIssues
+                  ? t('return.generateReport')
+                  : t('common.submit')}
             </Text>
           </>
         )}
@@ -263,6 +342,13 @@ export default function ReturnScreen() {
           originalPhoto={originalPhotos[capturePosition]}
         />
       )}
+
+      <PhotoLightbox
+        uri={lightboxPhoto?.uri ?? null}
+        label={lightboxPhoto?.label}
+        description={lightboxPhoto?.description}
+        onClose={() => setLightboxPhoto(null)}
+      />
     </ScrollView>
   );
 }
@@ -332,6 +418,7 @@ const styles = StyleSheet.create({
   comparisonImgContainer: {
     borderRadius: BorderRadius.sm,
     overflow: 'hidden',
+    position: 'relative',
   },
   issueContainer: {
     borderWidth: 2,
@@ -363,6 +450,28 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: Spacing.xs,
   },
+  expandBadge: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  editPhotoLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    marginTop: Spacing.xs,
+  },
+  editPhotoText: {
+    fontSize: FontSize.xs,
+    color: Colors.primary,
+    fontWeight: '600',
+  },
   submitBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -375,4 +484,30 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xl,
   },
   submitText: { color: Colors.white, fontSize: FontSize.md, fontWeight: '700' },
+  submitBtnDisabled: {
+    backgroundColor: Colors.gray400,
+  },
+  requiredHint: {
+    fontSize: FontSize.sm,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.sm,
+  },
+  validationBox: {
+    backgroundColor: '#fff7ed',
+    borderWidth: 1,
+    borderColor: '#fdba74',
+    borderRadius: BorderRadius.sm,
+    padding: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  validationTitle: {
+    fontSize: FontSize.sm,
+    fontWeight: '700',
+    color: '#9a3412',
+  },
+  validationText: {
+    fontSize: FontSize.sm,
+    color: '#9a3412',
+    marginTop: 2,
+  },
 });

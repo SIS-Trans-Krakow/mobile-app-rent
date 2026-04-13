@@ -85,4 +85,51 @@ router.patch('/:id', async (req: Request, res: Response) => {
   }
 });
 
+router.delete('/:id', (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const targetId = Number(id);
+    const currentUserId = req.user!.userId;
+    const db = getDb();
+
+    if (!Number.isFinite(targetId)) {
+      res.status(400).json({ error: 'Invalid user id' });
+      return;
+    }
+
+    const user = db.prepare('SELECT id, role FROM users WHERE id = ?').get(targetId) as Pick<User, 'id' | 'role'> | undefined;
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    if (currentUserId === targetId) {
+      res.status(400).json({ error: 'Cannot delete current user' });
+      return;
+    }
+
+    if (user.role === 'admin') {
+      const adminCountRow = db.prepare(
+        'SELECT COUNT(*) AS count FROM users WHERE role = ? AND active = 1'
+      ).get('admin') as { count: number };
+      if (adminCountRow.count <= 1) {
+        res.status(400).json({ error: 'Cannot delete last active admin' });
+        return;
+      }
+    }
+
+    const removeUser = db.transaction(() => {
+      db.prepare('UPDATE handovers SET created_by = ? WHERE created_by = ?').run(currentUserId, targetId);
+      db.prepare('UPDATE returns SET created_by = ? WHERE created_by = ?').run(currentUserId, targetId);
+      db.prepare('DELETE FROM users WHERE id = ?').run(targetId);
+    });
+    removeUser();
+
+    res.json({ message: 'User deleted' });
+  } catch (err) {
+    console.error('Delete user error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;

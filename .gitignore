@@ -7,3 +7,4 @@ backend/uploads/*.jpeg
 backend/uploads/*.png
 *.tsbuildinfo
 .DS_Store
+references

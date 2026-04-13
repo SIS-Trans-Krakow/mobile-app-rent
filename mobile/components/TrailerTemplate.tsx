@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Image, StyleSheet, ScrollView } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, FontSize, BorderRadius } from '../constants/theme';
 
 export type PhotoPosition =
@@ -28,6 +29,7 @@ interface Props {
   onZonePress: (position: PhotoPosition) => void;
   readOnly?: boolean;
   originalPhotos?: Record<string, ZonePhoto | undefined>;
+  onPhotoPress?: (photo: ZonePhoto) => void;
 }
 
 const POSITION_LABELS: Record<PhotoPosition, string> = {
@@ -49,13 +51,21 @@ export const ALL_POSITIONS: PhotoPosition[] = [
   'rear-left', 'rear-right',
 ];
 
-export default function TrailerTemplate({ photos, onZonePress, readOnly, originalPhotos }: Props) {
+export default function TrailerTemplate({ photos, onZonePress, readOnly, originalPhotos, onPhotoPress }: Props) {
   const { t } = useTranslation();
 
   const renderZone = (position: PhotoPosition, style?: object) => {
     const photo = photos[position];
     const hasPhoto = !!photo;
     const hasIssue = photo?.hasIssue;
+
+    const handlePress = () => {
+      if (readOnly) {
+        if (hasPhoto && onPhotoPress) onPhotoPress(photo!);
+      } else {
+        onZonePress(position);
+      }
+    };
 
     return (
       <TouchableOpacity
@@ -66,8 +76,8 @@ export default function TrailerTemplate({ photos, onZonePress, readOnly, origina
           hasIssue && styles.zoneWithIssue,
           style,
         ]}
-        onPress={() => !readOnly && onZonePress(position)}
-        disabled={readOnly}
+        onPress={handlePress}
+        disabled={readOnly && !hasPhoto}
       >
         {hasPhoto ? (
           <Image source={{ uri: photo.uri }} style={styles.zoneImage} />
@@ -75,6 +85,11 @@ export default function TrailerTemplate({ photos, onZonePress, readOnly, origina
           <Text style={styles.zoneText}>{t(POSITION_LABELS[position])}</Text>
         )}
         {hasIssue && <View style={styles.issueBadge}><Text style={styles.issueBadgeText}>!</Text></View>}
+        {readOnly && hasPhoto && (
+          <View style={styles.zoomHint}>
+            <Text style={styles.zoomHintText}>🔍</Text>
+          </View>
+        )}
       </TouchableOpacity>
     );
   };
@@ -127,7 +142,13 @@ export default function TrailerTemplate({ photos, onZonePress, readOnly, origina
 
       {/* Photo descriptions list */}
       {Object.entries(photos).filter(([_, v]) => v).map(([pos, photo]) => (
-        <View key={pos} style={styles.photoDesc}>
+        <TouchableOpacity
+          key={pos}
+          style={styles.photoDesc}
+          onPress={() => onPhotoPress && onPhotoPress(photo!)}
+          disabled={!onPhotoPress}
+          activeOpacity={onPhotoPress ? 0.7 : 1}
+        >
           <Image source={{ uri: photo!.uri }} style={styles.thumbSmall} />
           <View style={styles.photoDescContent}>
             <Text style={styles.photoDescLabel}>{t(POSITION_LABELS[pos as PhotoPosition])}</Text>
@@ -136,7 +157,10 @@ export default function TrailerTemplate({ photos, onZonePress, readOnly, origina
               <Text style={styles.issueText}>{photo!.issueDescription}</Text>
             )}
           </View>
-        </View>
+          {onPhotoPress && (
+            <Ionicons name="expand-outline" size={18} color={Colors.gray400} style={{ alignSelf: 'center' }} />
+          )}
+        </TouchableOpacity>
       ))}
     </ScrollView>
   );
@@ -228,6 +252,14 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: 11,
     fontWeight: '700',
+  },
+  zoomHint: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+  },
+  zoomHintText: {
+    fontSize: 10,
   },
   photoDesc: {
     flexDirection: 'row',

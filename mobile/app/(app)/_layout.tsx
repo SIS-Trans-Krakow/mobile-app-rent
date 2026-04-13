@@ -1,4 +1,4 @@
-import { Tabs, Redirect } from 'expo-router';
+import { Tabs, Redirect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../stores/auth';
@@ -6,6 +6,7 @@ import { Colors } from '../../constants/theme';
 
 export default function AppLayout() {
   const { t } = useTranslation();
+  const router = useRouter();
   const { isAuthenticated, isLoading, user } = useAuthStore();
 
   if (isLoading) return null;
@@ -16,40 +17,65 @@ export default function AppLayout() {
       screenOptions={{
         tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: Colors.gray400,
-        tabBarStyle: { paddingBottom: 4, height: 56 },
-        headerStyle: { backgroundColor: Colors.primary },
-        headerTintColor: Colors.white,
-        headerTitleStyle: { fontWeight: '600' },
+        tabBarStyle: {
+          backgroundColor: Colors.white,
+          borderTopColor: Colors.border,
+          borderTopWidth: 0.5,
+          paddingBottom: 4,
+          height: 52,
+        },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '500' },
+        headerStyle: {
+          backgroundColor: Colors.background,
+          shadowColor: 'transparent',
+          elevation: 0,
+          borderBottomWidth: 0.5,
+          borderBottomColor: Colors.border,
+        },
+        headerTintColor: Colors.text,
+        headerTitleStyle: { fontWeight: '600', fontSize: 17 },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: t('nav.dashboard'),
-          tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="handover"
         options={{
           title: t('nav.handovers'),
-          tabBarIcon: ({ color, size }) => <Ionicons name="document-text" size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => <Ionicons name="document-text-outline" size={size} color={color} />,
           headerShown: false,
+        }}
+        listeners={{
+          tabPress: (e) => {
+            e.preventDefault();
+            router.replace('/(app)/handover');
+          },
         }}
       />
       <Tabs.Screen
         name="return"
         options={{
           title: t('nav.returns'),
-          tabBarIcon: ({ color, size }) => <Ionicons name="arrow-undo" size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => <Ionicons name="arrow-undo-outline" size={size} color={color} />,
           headerShown: false,
+        }}
+        listeners={{
+          tabPress: (e) => {
+            e.preventDefault();
+            router.replace('/(app)/return/select');
+          },
         }}
       />
       <Tabs.Screen
         name="admin"
         options={{
           title: t('nav.admin'),
-          tabBarIcon: ({ color, size }) => <Ionicons name="settings" size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => <Ionicons name="settings-outline" size={size} color={color} />,
           headerShown: false,
           href: user?.role === 'admin' ? '/(app)/admin' : null,
         }}

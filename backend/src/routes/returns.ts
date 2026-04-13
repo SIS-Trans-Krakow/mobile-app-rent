@@ -8,6 +8,8 @@ import { authenticate } from '../middleware/auth';
 const router = Router();
 router.use(authenticate);
 
+const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png']);
+
 const storage = multer.diskStorage({
   destination: path.join(__dirname, '..', '..', 'uploads'),
   filename: (_req, file, cb) => {
@@ -15,7 +17,17 @@ const storage = multer.diskStorage({
     cb(null, `${uuidv4()}${ext}`);
   },
 });
-const upload = multer({ storage, limits: { fileSize: 20 * 1024 * 1024 } });
+const upload = multer({
+  storage,
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (ALLOWED_MIME_TYPES.has(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Niedozwolony format pliku: ${file.mimetype}. Dozwolone: jpg, jpeg, png`));
+    }
+  },
+});
 
 router.get('/:id', (req: Request, res: Response) => {
   const db = getDb();
@@ -84,6 +96,36 @@ router.post('/', upload.array('photos', 20), (req: Request, res: Response) => {
       return;
     }
 
+    const files = (req.files as Express.Multer.File[]) || [];
+    const positions = Array.isArray(photo_positions) ? photo_positions : photo_positions ? [photo_positions] : [];
+    const descriptions = Array.isArray(photo_descriptions) ? photo_descriptions : photo_descriptions ? [photo_descriptions] : [];
+    const hasIssues = Array.isArray(photo_has_issues) ? photo_has_issues : photo_has_issues ? [photo_has_issues] : [];
+    const issueDescs = Array.isArray(photo_issue_descriptions) ? photo_issue_descriptions : photo_issue_descriptions ? [photo_issue_descriptions] : [];
+
+    const requiredRows = db.prepare(
+      'SELECT DISTINCT position_on_template FROM handover_photos WHERE handover_id = ?'
+    ).all(Number(handover_id)) as Array<{ position_on_template: string }>;
+    const requiredPositions = requiredRows.map((row) => row.position_on_template);
+
+    if (requiredPositions.length > 0) {
+      const submittedPositions = new Set<string>();
+      for (let i = 0; i < files.length; i++) {
+        const position = (positions[i] || '').toString().trim();
+        if (position) {
+          submittedPositions.add(position);
+        }
+      }
+
+      const missingPositions = requiredPositions.filter((position) => !submittedPositions.has(position));
+      if (missingPositions.length > 0) {
+        res.status(400).json({
+          error: 'Missing return photos for required handover positions',
+          missing_positions: missingPositions,
+        });
+        return;
+      }
+    }
+
     const returnResult = db.prepare(`
       INSERT INTO returns (handover_id, created_by, return_date, return_time, notes)
       VALUES (?, ?, ?, ?, ?)
@@ -91,12 +133,6 @@ router.post('/', upload.array('photos', 20), (req: Request, res: Response) => {
     const returnId = Number(returnResult.lastInsertRowid);
 
     db.prepare('UPDATE handovers SET status = ? WHERE id = ?').run('returned', Number(handover_id));
-
-    const files = (req.files as Express.Multer.File[]) || [];
-    const positions = Array.isArray(photo_positions) ? photo_positions : photo_positions ? [photo_positions] : [];
-    const descriptions = Array.isArray(photo_descriptions) ? photo_descriptions : photo_descriptions ? [photo_descriptions] : [];
-    const hasIssues = Array.isArray(photo_has_issues) ? photo_has_issues : photo_has_issues ? [photo_has_issues] : [];
-    const issueDescs = Array.isArray(photo_issue_descriptions) ? photo_issue_descriptions : photo_issue_descriptions ? [photo_issue_descriptions] : [];
 
     const insertPhoto = db.prepare(
       'INSERT INTO return_photos (return_id, file_path, position_on_template, description, has_issue, issue_description) VALUES (?, ?, ?, ?, ?, ?)'

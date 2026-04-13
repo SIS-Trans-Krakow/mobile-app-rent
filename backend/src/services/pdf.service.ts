@@ -3,6 +3,11 @@ import path from 'path';
 import fs from 'fs';
 
 const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads');
+const FONT_CANDIDATES = [
+  path.join(__dirname, '..', '..', 'assets', 'fonts', 'DejaVuSans.ttf'),
+  '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+  '/usr/local/share/fonts/DejaVuSans.ttf',
+];
 
 const POSITION_LABELS: Record<string, string> = {
   'front': 'Przód',
@@ -55,8 +60,83 @@ interface ReturnData {
   }>;
 }
 
-export function generateHandoverPdf(data: HandoverData): PDFKit.PDFDocument {
+let resolvedFontPath: string | null | undefined;
+
+function resolvePdfFontPath(): string | null {
+  if (resolvedFontPath !== undefined) {
+    return resolvedFontPath;
+  }
+
+  resolvedFontPath = null;
+  for (const candidate of FONT_CANDIDATES) {
+    if (fs.existsSync(candidate)) {
+      resolvedFontPath = candidate;
+      break;
+    }
+  }
+
+  if (!resolvedFontPath) {
+    console.warn('[pdf] Unicode font not found, falling back to PDF built-in font.');
+  }
+
+  return resolvedFontPath;
+}
+
+function createPdfDocument(): PDFKit.PDFDocument {
   const doc = new PDFDocument({ size: 'A4', margin: 40 });
+  const fontPath = resolvePdfFontPath();
+
+  if (fontPath) {
+    doc.registerFont('main', fontPath);
+    doc.font('main');
+  }
+
+  return doc;
+}
+
+function drawImageOrPlaceholder(
+  doc: PDFKit.PDFDocument,
+  filePath: string,
+  options: {
+    width: number;
+    height: number;
+    x?: number;
+    y?: number;
+  }
+): void {
+  const { width, height, x, y } = options;
+  const targetX = x ?? doc.x;
+  const targetY = y ?? doc.y;
+
+  const drawPlaceholder = (message: string) => {
+    doc.save();
+    doc.rect(targetX, targetY, width, height).strokeColor('#9ca3af').lineWidth(1).stroke();
+    doc.fontSize(8).fillColor('#6b7280').text(message, targetX + 8, targetY + height / 2 - 6, {
+      width: width - 16,
+      align: 'center',
+    });
+    doc.fillColor('black');
+    doc.restore();
+  };
+
+  if (!fs.existsSync(filePath)) {
+    drawPlaceholder('Brak pliku zdjęcia');
+    return;
+  }
+
+  try {
+    if (typeof x === 'number' && typeof y === 'number') {
+      doc.image(filePath, x, y, { width, height });
+    } else {
+      doc.image(filePath, { width, height });
+    }
+  } catch {
+    drawPlaceholder('Nie można załadować zdjęcia');
+  }
+}
+
+export function generateHandoverPdf(data: HandoverData): PDFKit.PDFDocument {
+  const doc = createPdfDocument();
 
   doc.fontSize(20).text('Protokół przekazania naczepy', { align: 'center' });
   doc.moveDown(0.5);
@@ -114,15 +194,7 @@ export function generateHandoverPdf(data: HandoverData): PDFKit.PDFDocument {
         doc.text(`Opis: ${photo.description}`);
       }
 
-      if (fs.existsSync(filePath)) {
-        try {
-          doc.image(filePath, { width: 250, height: 180 });
-        } catch {
-          doc.text('[Nie można załadować zdjęcia]');
-        }
-      } else {
-        doc.text('[Brak pliku zdjęcia]');
-      }
+      drawImageOrPlaceholder(doc, filePath, { width: 250, height: 180 });
       doc.moveDown(0.8);
     }
   }
@@ -131,7 +203,7 @@ export function generateHandoverPdf(data: HandoverData): PDFKit.PDFDocument {
 }
 
 export function generateReturnPdf(handoverData: HandoverData, returnData: ReturnData): PDFKit.PDFDocument {
-  const doc = new PDFDocument({ size: 'A4', margin: 40 });
+  const doc = createPdfDocument();
 
   doc.fontSize(20).text('Protokół zwrotu naczepy', { align: 'center' });
   doc.moveDown(0.5);
@@ -204,9 +276,7 @@ export function generateReturnPdf(handoverData: HandoverData, returnData: Return
     doc.fontSize(8).text('PRZEKAZANIE:', leftX, startY);
     if (handoverPhoto) {
       const fp = path.join(UPLOADS_DIR, handoverPhoto.file_path);
-      if (fs.existsSync(fp)) {
-        try { doc.image(fp, leftX, startY + 12, { width: imgW, height: imgH }); } catch { /* skip */ }
-      }
+      drawImageOrPlaceholder(doc, fp, { x: leftX, y: startY + 12, width: imgW, height: imgH });
       if (handoverPhoto.description) {
         doc.fontSize(7).text(handoverPhoto.description, leftX, startY + imgH + 14, { width: imgW });
       }
@@ -217,9 +287,7 @@ export function generateReturnPdf(handoverData: HandoverData, returnData: Return
     doc.fontSize(8).text('ZWROT:', rightX, startY);
     if (returnPhoto) {
       const fp = path.join(UPLOADS_DIR, returnPhoto.file_path);
-      if (fs.existsSync(fp)) {
-        try { doc.image(fp, rightX, startY + 12, { width: imgW, height: imgH }); } catch { /* skip */ }
-      }
+      drawImageOrPlaceholder(doc, fp, { x: rightX, y: startY + 12, width: imgW, height: imgH });
       if (returnPhoto.has_issue) {
         doc.fontSize(8).fillColor('red')
           .text(`NIEPRAWIDŁOWOŚĆ: ${returnPhoto.issue_description}`, rightX, startY + imgH + 14, { width: imgW });

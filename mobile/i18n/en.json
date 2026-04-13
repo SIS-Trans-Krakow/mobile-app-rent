@@ -117,6 +117,8 @@
     "roleUser": "User",
     "active": "Active",
     "inactive": "Inactive",
-    "userCreated": "User created"
+    "userCreated": "User created",
+    "userDeleted": "User deleted",
+    "deleteUserConfirm": "Are you sure you want to delete user"
   }
 }

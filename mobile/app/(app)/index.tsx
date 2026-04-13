@@ -22,56 +22,62 @@ export default function DashboardScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.welcome}>
-        <Text style={styles.welcomeText}>
-          {t('auth.welcome')}, {user?.full_name}
-        </Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.welcomeLabel}>{t('auth.welcome')}</Text>
+          <Text style={styles.welcomeName}>{user?.full_name}</Text>
+        </View>
         <View style={styles.topActions}>
           <TouchableOpacity onPress={toggleLang} style={styles.iconBtn}>
-            <Text style={{ fontSize: 20 }}>{i18n.language === 'pl' ? '🇬🇧' : '🇵🇱'}</Text>
+            <Text style={{ fontSize: 18 }}>{i18n.language === 'pl' ? '🇬🇧' : '🇵🇱'}</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={handleLogout} style={styles.iconBtn}>
-            <Ionicons name="log-out-outline" size={22} color={Colors.gray600} />
+            <Ionicons name="log-out-outline" size={20} color={Colors.gray500} />
           </TouchableOpacity>
         </View>
       </View>
 
       <TouchableOpacity
-        style={[styles.card, { backgroundColor: Colors.primary }]}
+        style={styles.actionCard}
         onPress={() => router.push('/(app)/handover/new')}
+        activeOpacity={0.7}
       >
-        <Ionicons name="add-circle" size={40} color={Colors.white} />
-        <View style={styles.cardContent}>
-          <Text style={[styles.cardTitle, { color: Colors.white }]}>{t('dashboard.newHandover')}</Text>
-          <Text style={[styles.cardDesc, { color: 'rgba(255,255,255,0.8)' }]}>
-            {t('handover.new')}
-          </Text>
+        <View style={[styles.actionIcon, { backgroundColor: '#eff6ff' }]}>
+          <Ionicons name="add-circle-outline" size={26} color={Colors.primary} />
         </View>
-        <Ionicons name="chevron-forward" size={24} color="rgba(255,255,255,0.8)" />
+        <View style={styles.actionContent}>
+          <Text style={styles.actionTitle}>{t('dashboard.newHandover')}</Text>
+          <Text style={styles.actionDesc}>{t('handover.new')}</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={Colors.gray400} />
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={[styles.card, { backgroundColor: Colors.success }]}
+        style={styles.actionCard}
         onPress={() => router.push('/(app)/return/select')}
+        activeOpacity={0.7}
       >
-        <Ionicons name="arrow-undo-circle" size={40} color={Colors.white} />
-        <View style={styles.cardContent}>
-          <Text style={[styles.cardTitle, { color: Colors.white }]}>{t('dashboard.returnTrailer')}</Text>
-          <Text style={[styles.cardDesc, { color: 'rgba(255,255,255,0.8)' }]}>
-            {t('return.title')}
-          </Text>
+        <View style={[styles.actionIcon, { backgroundColor: '#ecfdf5' }]}>
+          <Ionicons name="arrow-undo-circle-outline" size={26} color={Colors.success} />
         </View>
-        <Ionicons name="chevron-forward" size={24} color="rgba(255,255,255,0.8)" />
+        <View style={styles.actionContent}>
+          <Text style={styles.actionTitle}>{t('dashboard.returnTrailer')}</Text>
+          <Text style={styles.actionDesc}>{t('return.title')}</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={Colors.gray400} />
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={styles.cardLight}
+        style={styles.actionCard}
         onPress={() => router.push('/(app)/handover/')}
+        activeOpacity={0.7}
       >
-        <Ionicons name="list" size={32} color={Colors.primary} />
-        <View style={styles.cardContent}>
-          <Text style={styles.cardTitle}>{t('dashboard.allHandovers')}</Text>
+        <View style={[styles.actionIcon, { backgroundColor: Colors.gray100 }]}>
+          <Ionicons name="list-outline" size={26} color={Colors.gray600} />
         </View>
-        <Ionicons name="chevron-forward" size={24} color={Colors.gray400} />
+        <View style={styles.actionContent}>
+          <Text style={styles.actionTitle}>{t('dashboard.allHandovers')}</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={Colors.gray400} />
       </TouchableOpacity>
     </ScrollView>
   );
@@ -79,40 +85,44 @@ export default function DashboardScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  content: { padding: Spacing.md },
+  content: { padding: Spacing.md, paddingTop: Spacing.sm },
   welcome: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: Spacing.lg,
-    paddingTop: Spacing.sm,
+    paddingTop: Spacing.xs,
   },
-  welcomeText: { fontSize: FontSize.lg, fontWeight: '600', color: Colors.text, flex: 1 },
-  topActions: { flexDirection: 'row', gap: Spacing.sm },
-  iconBtn: { padding: Spacing.xs },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
-    marginBottom: Spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  cardLight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
-    marginBottom: Spacing.md,
+  welcomeLabel: { fontSize: FontSize.sm, color: Colors.textSecondary },
+  welcomeName: { fontSize: FontSize.xl, fontWeight: '700', color: Colors.text, marginTop: 2 },
+  topActions: { flexDirection: 'row', gap: Spacing.xs },
+  iconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: Colors.white,
     borderWidth: 1,
     borderColor: Colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  cardContent: { flex: 1, marginLeft: Spacing.md },
-  cardTitle: { fontSize: FontSize.lg, fontWeight: '600', color: Colors.text },
-  cardDesc: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 2 },
+  actionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  actionIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  actionContent: { flex: 1, marginLeft: Spacing.md },
+  actionTitle: { fontSize: FontSize.md, fontWeight: '600', color: Colors.text },
+  actionDesc: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 1 },
 });

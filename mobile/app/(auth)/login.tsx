@@ -94,7 +94,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.background,
   },
   inner: {
     flex: 1,
@@ -106,28 +106,25 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xl,
   },
   icon: {
-    fontSize: 64,
+    fontSize: 56,
     marginBottom: Spacing.md,
   },
   title: {
     fontSize: FontSize.xxl,
     fontWeight: '700',
-    color: Colors.white,
+    color: Colors.text,
     marginBottom: Spacing.xs,
   },
   subtitle: {
-    fontSize: FontSize.lg,
-    color: 'rgba(255,255,255,0.8)',
+    fontSize: FontSize.md,
+    color: Colors.textSecondary,
   },
   form: {
     backgroundColor: Colors.white,
     borderRadius: BorderRadius.lg,
     padding: Spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   label: {
     fontSize: FontSize.sm,
@@ -166,7 +163,7 @@ const styles = StyleSheet.create({
     padding: Spacing.sm,
   },
   langText: {
-    color: 'rgba(255,255,255,0.9)',
+    color: Colors.textSecondary,
     fontSize: FontSize.md,
   },
 });

@@ -72,6 +72,7 @@ export default function NewHandoverScreen() {
   };
 
   const handleSubmit = async () => {
+    if (loading) return;
     setLoading(true);
     try {
       const formData = new FormData();
@@ -91,24 +92,40 @@ export default function NewHandoverScreen() {
       const photoEntries = Object.values(photos).filter(Boolean) as ZonePhoto[];
       for (const photo of photoEntries) {
         const filename = photo.uri.split('/').pop() || 'photo.jpg';
-        formData.append('photos', {
-          uri: photo.uri,
-          name: filename,
-          type: 'image/jpeg',
-        } as any);
+        if (Platform.OS === 'web') {
+          const response = await fetch(photo.uri);
+          const blob = await response.blob();
+          const file = new File([blob], filename, { type: blob.type || 'image/jpeg' });
+          formData.append('photos', file);
+        } else {
+          formData.append('photos', { uri: photo.uri, name: filename, type: 'image/jpeg' } as any);
+        }
         formData.append('photo_positions', photo.position);
         formData.append('photo_descriptions', photo.description || '');
       }
 
-      await api.post('/handovers', formData, {
+      const res = await api.post('/handovers', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      Alert.alert(t('common.success'), t('handover.created'), [
-        { text: t('common.ok'), onPress: () => router.back() },
-      ]);
+      const createdId = res?.data?.id;
+      const target = createdId ? `/handover/${createdId}` : '/handover';
+
+      if (Platform.OS === 'web') {
+        window.alert(t('handover.created'));
+        router.replace(target);
+      } else {
+        Alert.alert(t('common.success'), t('handover.created'), [
+          { text: t('common.ok'), onPress: () => router.replace(target) },
+        ]);
+      }
     } catch (err: any) {
-      Alert.alert(t('common.error'), err?.response?.data?.error || 'Error');
+      const msg = err?.response?.data?.error || 'Error';
+      if (Platform.OS === 'web') {
+        window.alert(msg);
+      } else {
+        Alert.alert(t('common.error'), msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -220,14 +237,12 @@ export default function NewHandoverScreen() {
       ) : null}
 
       <Text style={styles.sectionTitle}>{t('handover.photos')}</Text>
-      <Text style={styles.summaryDetail}>
-        {Object.values(photos).filter(Boolean).length} {t('handover.photos').toLowerCase()}
-      </Text>
+      <Text style={styles.summaryDetail}>{Object.values(photos).filter(Boolean).length}</Text>
     </ScrollView>
   );
 
   const steps = [renderCompanyStep, renderTrailerStep, renderPhotosStep, renderSummary];
-  const stepLabels = [t('handover.company'), t('handover.trailer'), t('handover.photos'), 'Summary'];
+  const stepLabels = [t('handover.company'), t('handover.trailer'), t('handover.photos'), 'Podsumowanie'];
 
   return (
     <View style={styles.container}>
@@ -249,25 +264,37 @@ export default function NewHandoverScreen() {
 
       {/* Step content */}
       <View style={styles.content}>
+        <View style={styles.stepHeader}>
+          <Text style={styles.stepHeaderTitle}>{stepLabels[step]}</Text>
+          <Text style={styles.stepHeaderSubtitle}>Krok {step + 1} z {steps.length}</Text>
+        </View>
         {steps[step]()}
       </View>
 
       {/* Navigation */}
       <View style={styles.nav}>
         {step > 0 && (
-          <TouchableOpacity style={styles.navBtnSecondary} onPress={() => setStep(step - 1)}>
+          <TouchableOpacity
+            style={[styles.navBtnSecondary, loading && styles.navBtnDisabled]}
+            onPress={() => setStep(step - 1)}
+            disabled={loading}
+          >
             <Text style={styles.navBtnSecondaryText}>{t('common.back')}</Text>
           </TouchableOpacity>
         )}
         <View style={{ flex: 1 }} />
         {step < steps.length - 1 ? (
-          <TouchableOpacity style={styles.navBtn} onPress={handleNext}>
+          <TouchableOpacity
+            style={[styles.navBtn, loading && styles.navBtnDisabled]}
+            onPress={handleNext}
+            disabled={loading}
+          >
             <Text style={styles.navBtnText}>{t('common.next')}</Text>
             <Ionicons name="chevron-forward" size={18} color={Colors.white} />
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
-            style={[styles.navBtn, { backgroundColor: Colors.success }]}
+            style={[styles.navBtn, { backgroundColor: Colors.success }, loading && styles.navBtnDisabled]}
             onPress={handleSubmit}
             disabled={loading}
           >
@@ -299,10 +326,10 @@ const styles = StyleSheet.create({
   progress: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingVertical: Spacing.md,
+    paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.sm,
-    backgroundColor: Colors.white,
-    borderBottomWidth: 1,
+    backgroundColor: Colors.background,
+    borderBottomWidth: 0.5,
     borderBottomColor: Colors.border,
   },
   progressItem: { alignItems: 'center' },
@@ -320,6 +347,26 @@ const styles = StyleSheet.create({
   progressLabel: { fontSize: 10, color: Colors.gray400, marginTop: 2 },
   progressLabelActive: { color: Colors.primary, fontWeight: '600' },
   content: { flex: 1 },
+  stepHeader: {
+    marginHorizontal: Spacing.md,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.xs,
+    padding: Spacing.md,
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  stepHeaderTitle: {
+    fontSize: FontSize.md,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  stepHeaderSubtitle: {
+    marginTop: 2,
+    fontSize: FontSize.xs,
+    color: Colors.textSecondary,
+  },
   sectionTitle: {
     fontSize: FontSize.lg,
     fontWeight: '700',
@@ -362,8 +409,8 @@ const styles = StyleSheet.create({
   nav: {
     flexDirection: 'row',
     padding: Spacing.md,
-    backgroundColor: Colors.white,
-    borderTopWidth: 1,
+    backgroundColor: Colors.background,
+    borderTopWidth: 0.5,
     borderTopColor: Colors.border,
   },
   navBtn: {
@@ -380,6 +427,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.lg,
   },
+  navBtnDisabled: { opacity: 0.6 },
   navBtnSecondaryText: { color: Colors.textSecondary, fontSize: FontSize.md },
   summaryText: { fontSize: FontSize.md, color: Colors.text, fontWeight: '600' },
   summaryDetail: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 2 },

@@ -7,9 +7,12 @@ export default function AdminLayout() {
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: Colors.primary },
-        headerTintColor: Colors.white,
-        headerTitleStyle: { fontWeight: '600' },
+        headerStyle: {
+          backgroundColor: Colors.background,
+        },
+        headerShadowVisible: false,
+        headerTintColor: Colors.primary,
+        headerTitleStyle: { fontWeight: '600', fontSize: 17, color: Colors.text },
       }}
     >
       <Stack.Screen name="index" options={{ title: t('nav.admin') }} />

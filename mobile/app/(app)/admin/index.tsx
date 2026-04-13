@@ -7,6 +7,7 @@ import { useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../../../services/api';
+import { useAuthStore } from '../../../stores/auth';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../../constants/theme';
 
 interface UserItem {
@@ -19,6 +20,7 @@ interface UserItem {
 
 export default function AdminScreen() {
   const { t } = useTranslation();
+  const { user } = useAuthStore();
   const [users, setUsers] = useState<UserItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
@@ -82,6 +84,29 @@ export default function AdminScreen() {
     }
   };
 
+  const deleteUser = async (targetUser: UserItem) => {
+    Alert.alert(
+      t('common.delete'),
+      `${t('admin.deleteUserConfirm')} ${targetUser.full_name}?`,
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('common.delete'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await api.delete(`/users/${targetUser.id}`);
+              Alert.alert(t('common.success'), t('admin.userDeleted'));
+              loadUsers();
+            } catch (err: any) {
+              Alert.alert(t('common.error'), err?.response?.data?.error || 'Error');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -106,11 +131,21 @@ export default function AdminScreen() {
               <Text style={[styles.statusText, { color: item.active ? Colors.success : Colors.danger }]}>
                 {item.active ? t('admin.active') : t('admin.inactive')}
               </Text>
-              <Switch
-                value={!!item.active}
-                onValueChange={() => toggleActive(item)}
-                trackColor={{ true: Colors.success }}
-              />
+              <View style={styles.actionsRow}>
+                <Switch
+                  value={!!item.active}
+                  onValueChange={() => toggleActive(item)}
+                  trackColor={{ true: Colors.success }}
+                />
+                {user?.id !== item.id && (
+                  <TouchableOpacity
+                    style={styles.deleteIconBtn}
+                    onPress={() => deleteUser(item)}
+                  >
+                    <Ionicons name="trash-outline" size={18} color={Colors.danger} />
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           </View>
         )}
@@ -195,6 +230,21 @@ const styles = StyleSheet.create({
   userName: { fontSize: FontSize.md, fontWeight: '600', color: Colors.text },
   userDetail: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 2 },
   cardActions: { alignItems: 'center' },
+  actionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  deleteIconBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    backgroundColor: '#fef2f2',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   statusText: { fontSize: FontSize.xs, fontWeight: '600', marginBottom: 4 },
   fab: {
     position: 'absolute',

@@ -98,4 +98,28 @@ function initSchema(db: Database.Database): void {
       FOREIGN KEY (return_id) REFERENCES returns(id) ON DELETE CASCADE
     );
   `);
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_companies_name ON companies(name);
+    CREATE INDEX IF NOT EXISTS idx_trailers_registration_number ON trailers(registration_number);
+  `);
+
+  const duplicateTrailers = db.prepare(`
+    SELECT UPPER(TRIM(registration_number)) AS registration_key, COUNT(*) AS count
+    FROM trailers
+    GROUP BY registration_key
+    HAVING count > 1
+    LIMIT 1
+  `).get() as { registration_key: string; count: number } | undefined;
+
+  if (duplicateTrailers) {
+    console.warn(
+      `[db] Skipping unique trailer registration index, duplicate key detected: ${duplicateTrailers.registration_key}`
+    );
+  } else {
+    db.exec(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_trailers_registration_number_unique
+      ON trailers(UPPER(TRIM(registration_number)));
+    `);
+  }
 }

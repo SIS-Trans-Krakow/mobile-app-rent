@@ -117,6 +117,8 @@
     "roleUser": "Użytkownik",
     "active": "Aktywny",
     "inactive": "Nieaktywny",
-    "userCreated": "Użytkownik utworzony"
+    "userCreated": "Użytkownik utworzony",
+    "userDeleted": "Użytkownik usunięty",
+    "deleteUserConfirm": "Czy na pewno usunąć użytkownika"
   }
 }

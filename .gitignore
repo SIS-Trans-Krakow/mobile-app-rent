@@ -11,3 +11,6 @@ references
 .env
 .env.local
 .env*.local
+mobile/.env
+mobile/.env.production
+# mobile/.env.example is intentionally tracked as a template

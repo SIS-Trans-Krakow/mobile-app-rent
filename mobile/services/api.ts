@@ -1,10 +1,10 @@
 import axios from 'axios';
 import { Platform } from 'react-native';
 
-const BASE_URL = Platform.select({
-  android: 'http://10.0.2.2:3001',
-  default: 'http://localhost:3001',
-});
+// On Android emulator, localhost resolves to the emulator itself — 10.0.2.2 points to the host machine.
+const rawUrl = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3001';
+const BASE_URL =
+  Platform.OS === 'android' ? rawUrl.replace('localhost', '10.0.2.2') : rawUrl;
 
 const api = axios.create({
   baseURL: `${BASE_URL}/api`,

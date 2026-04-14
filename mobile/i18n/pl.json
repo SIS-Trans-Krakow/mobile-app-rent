@@ -67,7 +67,13 @@
     "returned": "Zwrócone",
     "created": "Przekazanie utworzone",
     "selectExisting": "Wybierz istniejącą",
-    "createNew": "Utwórz nową"
+    "createNew": "Utwórz nową",
+    "searchTrailerPlaceholder": "Wpisz numer rejestracyjny...",
+    "trailerFromDb": "Naczepa z bazy danych",
+    "clearSelection": "Wyczyść wybór",
+    "noTrailersFound": "Nie znaleziono naczep",
+    "searching": "Szukam...",
+    "manualEntry": "Nowa naczepa (wpis ręczny)"
   },
   "trailer": {
     "types": {

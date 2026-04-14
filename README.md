@@ -44,7 +44,28 @@ The backend starts on `http://localhost:3001`. A default admin user is created a
 - **Username:** `admin`
 - **Password:** `admin123`
 
-### 2. Start the Mobile App
+### 2. Configure the Mobile App
+
+The mobile app reads the backend URL from environment variables. Copy the example file and adjust if needed:
+
+```bash
+cp mobile/.env.example mobile/.env
+```
+
+| File | Used when | Default value |
+|---|---|---|
+| `mobile/.env` | development (`expo start`) | `http://localhost:3001` |
+| `mobile/.env.production` | production build (`eas build`) | `https://api.twojadomena.pl` |
+
+The app automatically replaces `localhost` with `10.0.2.2` when running on the Android emulator, so you don't need to change anything for local development.
+
+For a **physical device** on a local network, set your machine's local IP in `mobile/.env`:
+
+```
+EXPO_PUBLIC_API_URL=http://192.168.1.100:3001
+```
+
+### 3. Start the Mobile App
 
 ```bash
 cd mobile

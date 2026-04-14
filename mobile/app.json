@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Trailer Handover",
-    "slug": "trailer-handover",
+    "slug": "app-rent",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -22,11 +22,22 @@
         "backgroundColor": "#1a56db"
       },
       "edgeToEdgeEnabled": true,
-      "permissions": ["CAMERA", "READ_EXTERNAL_STORAGE", "WRITE_EXTERNAL_STORAGE"]
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.sisorganization.apprent"
     },
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "b5e8f3be-511e-478a-9ef1-19a5c9164488"
+      }
     },
     "plugins": [
       "expo-router",
@@ -43,6 +54,7 @@
           "photosPermission": "Allow Trailer Handover to access your photos."
         }
       ]
-    ]
+    ],
+    "owner": "sis-organization"
   }
 }

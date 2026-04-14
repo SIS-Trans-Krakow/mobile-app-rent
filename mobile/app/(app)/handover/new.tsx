@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView,
   Alert, ActivityIndicator, Platform,
@@ -13,6 +13,15 @@ import PhotoCapture from '../../../components/PhotoCapture';
 
 const TRAILER_TYPES = ['Kurtyna', 'Box', 'Izoterma', 'Chłodnia', 'Kurtyna MEGA', 'TANDEM', 'Double Deck'] as const;
 
+interface TrailerResult {
+  id: number;
+  registration_number: string;
+  vin: string;
+  brand: string;
+  type: string;
+  production_date: string;
+}
+
 export default function NewHandoverScreen() {
   const { t } = useTranslation();
   const router = useRouter();
@@ -26,6 +35,14 @@ export default function NewHandoverScreen() {
   const [companyPhone, setCompanyPhone] = useState('');
   const [companyEmail, setCompanyEmail] = useState('');
   const [companyContact, setCompanyContact] = useState('');
+
+  // Trailer search
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<TrailerResult[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+  const [selectedTrailer, setSelectedTrailer] = useState<TrailerResult | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Trailer fields
   const [registrationNumber, setRegistrationNumber] = useState('');
@@ -44,6 +61,60 @@ export default function NewHandoverScreen() {
   const [photos, setPhotos] = useState<Record<string, ZonePhoto | undefined>>({});
   const [capturePosition, setCapturePosition] = useState<PhotoPosition | null>(null);
 
+  const searchTrailers = useCallback((query: string) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!query.trim() || query.trim().length < 2) {
+      setSearchResults([]);
+      setShowResults(false);
+      setSearchLoading(false);
+      return;
+    }
+    setSearchLoading(true);
+    setShowResults(true);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await api.get('/trailers', { params: { search: query.trim() } });
+        setSearchResults(res.data || []);
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 300);
+  }, []);
+
+  const handleSearchChange = (text: string) => {
+    setSearchQuery(text);
+    if (selectedTrailer) {
+      clearTrailerSelection();
+    }
+    searchTrailers(text);
+  };
+
+  const selectTrailer = (trailer: TrailerResult) => {
+    setSelectedTrailer(trailer);
+    setSearchQuery(trailer.registration_number);
+    setRegistrationNumber(trailer.registration_number);
+    setVin(trailer.vin || '');
+    setBrand(trailer.brand || '');
+    if (TRAILER_TYPES.includes(trailer.type as any)) {
+      setTrailerType(trailer.type);
+    }
+    setShowResults(false);
+    setSearchResults([]);
+  };
+
+  const clearTrailerSelection = () => {
+    setSelectedTrailer(null);
+    setRegistrationNumber('');
+    setVin('');
+    setBrand('');
+    setTrailerType(TRAILER_TYPES[0]);
+    setSearchQuery('');
+    setShowResults(false);
+    setSearchResults([]);
+  };
+
   const handleZonePress = (position: PhotoPosition) => {
     setCapturePosition(position);
   };
@@ -59,7 +130,8 @@ export default function NewHandoverScreen() {
         return false;
       }
     } else if (step === 1) {
-      if (!registrationNumber.trim()) {
+      const regNum = selectedTrailer ? selectedTrailer.registration_number : registrationNumber;
+      if (!regNum.trim()) {
         Alert.alert(t('common.error'), t('common.required'));
         return false;
       }
@@ -81,6 +153,9 @@ export default function NewHandoverScreen() {
       formData.append('company_phone', companyPhone);
       formData.append('company_email', companyEmail);
       formData.append('company_contact', companyContact);
+      if (selectedTrailer) {
+        formData.append('trailer_id', String(selectedTrailer.id));
+      }
       formData.append('registration_number', registrationNumber);
       formData.append('vin', vin);
       formData.append('brand', brand);
@@ -159,53 +234,162 @@ export default function NewHandoverScreen() {
     </ScrollView>
   );
 
-  const renderTrailerStep = () => (
-    <ScrollView contentContainerStyle={styles.scrollContent}>
-      <Text style={styles.sectionTitle}>{t('handover.trailer')}</Text>
+  const renderTrailerStep = () => {
+    const isFromDb = !!selectedTrailer;
 
-      <Text style={styles.label}>{t('handover.registrationNumber')} *</Text>
-      <TextInput style={styles.input} value={registrationNumber} onChangeText={setRegistrationNumber}
-        placeholder={t('handover.registrationNumber')} placeholderTextColor={Colors.gray400}
-        autoCapitalize="characters" />
+    return (
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        <Text style={styles.sectionTitle}>{t('handover.trailer')}</Text>
 
-      <Text style={styles.label}>{t('handover.vin')}</Text>
-      <TextInput style={styles.input} value={vin} onChangeText={setVin}
-        placeholder={t('handover.vin')} placeholderTextColor={Colors.gray400}
-        autoCapitalize="characters" />
+        <Text style={styles.label}>{t('handover.registrationNumber')} *</Text>
+        <View style={styles.searchContainer}>
+          <View style={styles.searchInputRow}>
+            <Ionicons name="search" size={18} color={Colors.gray400} style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              value={searchQuery}
+              onChangeText={handleSearchChange}
+              placeholder={t('handover.searchTrailerPlaceholder')}
+              placeholderTextColor={Colors.gray400}
+              autoCapitalize="characters"
+            />
+            {searchLoading && <ActivityIndicator size="small" color={Colors.primary} style={styles.searchSpinner} />}
+            {isFromDb && (
+              <TouchableOpacity onPress={clearTrailerSelection} style={styles.clearBtn}>
+                <Ionicons name="close-circle" size={20} color={Colors.gray400} />
+              </TouchableOpacity>
+            )}
+          </View>
 
-      <Text style={styles.label}>{t('handover.brand')}</Text>
-      <TextInput style={styles.input} value={brand} onChangeText={setBrand}
-        placeholder={t('handover.brand')} placeholderTextColor={Colors.gray400} />
+          {showResults && !isFromDb && (
+            <View style={styles.resultsDropdown}>
+              <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled>
+              {searchLoading ? (
+                <View style={styles.resultItem}>
+                  <Text style={styles.resultHint}>{t('handover.searching')}</Text>
+                </View>
+              ) : searchResults.length > 0 ? (
+                <>
+                  {searchResults.map((trailer) => (
+                    <TouchableOpacity
+                      key={trailer.id}
+                      style={styles.resultItem}
+                      onPress={() => selectTrailer(trailer)}
+                    >
+                      <View style={styles.resultMain}>
+                        <Text style={styles.resultReg}>{trailer.registration_number}</Text>
+                        <Text style={styles.resultMeta}>
+                          {[trailer.brand, t(`trailer.types.${trailer.type}`)].filter(Boolean).join(' · ')}
+                        </Text>
+                      </View>
+                      {trailer.vin ? <Text style={styles.resultVin}>VIN: {trailer.vin}</Text> : null}
+                    </TouchableOpacity>
+                  ))}
+                  <TouchableOpacity
+                    style={styles.resultItemManual}
+                    onPress={() => {
+                      setRegistrationNumber(searchQuery.trim().toUpperCase());
+                      setShowResults(false);
+                      setSearchResults([]);
+                    }}
+                  >
+                    <Ionicons name="add-circle-outline" size={18} color={Colors.primary} />
+                    <Text style={styles.resultManualText}>{t('handover.manualEntry')}</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <View style={styles.resultItem}>
+                    <Text style={styles.resultHint}>{t('handover.noTrailersFound')}</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.resultItemManual}
+                    onPress={() => {
+                      setRegistrationNumber(searchQuery.trim().toUpperCase());
+                      setShowResults(false);
+                      setSearchResults([]);
+                    }}
+                  >
+                    <Ionicons name="add-circle-outline" size={18} color={Colors.primary} />
+                    <Text style={styles.resultManualText}>{t('handover.manualEntry')}</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+              </ScrollView>
+            </View>
+          )}
+        </View>
 
-      <Text style={styles.label}>{t('handover.trailerType')} *</Text>
-      <View style={styles.typeRow}>
-        {TRAILER_TYPES.map((type) => (
-          <TouchableOpacity
-            key={type}
-            style={[styles.typeChip, trailerType === type && styles.typeChipActive]}
-            onPress={() => setTrailerType(type)}
-          >
-            <Text style={[styles.typeChipText, trailerType === type && styles.typeChipTextActive]}>
-              {t(`trailer.types.${type}`)}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+        {isFromDb && (
+          <View style={styles.selectedBadge}>
+            <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
+            <Text style={styles.selectedBadgeText}>{t('handover.trailerFromDb')}</Text>
+          </View>
+        )}
 
-      <Text style={styles.label}>{t('handover.date')}</Text>
-      <TextInput style={styles.input} value={handoverDate} onChangeText={setHandoverDate}
-        placeholder="YYYY-MM-DD" placeholderTextColor={Colors.gray400} />
+        {(!isFromDb && !showResults && registrationNumber.trim()) && (
+          <View style={styles.manualBadge}>
+            <Ionicons name="create-outline" size={16} color={Colors.warning} />
+            <Text style={styles.manualBadgeText}>{t('handover.manualEntry')}</Text>
+          </View>
+        )}
 
-      <Text style={styles.label}>{t('handover.time')}</Text>
-      <TextInput style={styles.input} value={handoverTime} onChangeText={setHandoverTime}
-        placeholder="HH:MM" placeholderTextColor={Colors.gray400} />
+        <Text style={styles.label}>{t('handover.vin')}</Text>
+        <TextInput
+          style={[styles.input, isFromDb && styles.inputDisabled]}
+          value={vin}
+          onChangeText={isFromDb ? undefined : setVin}
+          editable={!isFromDb}
+          placeholder={t('handover.vin')}
+          placeholderTextColor={Colors.gray400}
+          autoCapitalize="characters"
+        />
 
-      <Text style={styles.label}>{t('handover.equipment')}</Text>
-      <TextInput style={[styles.input, styles.textArea]} value={equipmentNotes}
-        onChangeText={setEquipmentNotes} placeholder={t('handover.equipmentNotes')}
-        placeholderTextColor={Colors.gray400} multiline numberOfLines={4} />
-    </ScrollView>
-  );
+        <Text style={styles.label}>{t('handover.brand')}</Text>
+        <TextInput
+          style={[styles.input, isFromDb && styles.inputDisabled]}
+          value={brand}
+          onChangeText={isFromDb ? undefined : setBrand}
+          editable={!isFromDb}
+          placeholder={t('handover.brand')}
+          placeholderTextColor={Colors.gray400}
+        />
+
+        <Text style={styles.label}>{t('handover.trailerType')} *</Text>
+        <View style={styles.typeRow}>
+          {TRAILER_TYPES.map((type) => (
+            <TouchableOpacity
+              key={type}
+              style={[
+                styles.typeChip,
+                trailerType === type && styles.typeChipActive,
+                isFromDb && styles.typeChipDisabled,
+              ]}
+              onPress={isFromDb ? undefined : () => setTrailerType(type)}
+              disabled={isFromDb}
+            >
+              <Text style={[styles.typeChipText, trailerType === type && styles.typeChipTextActive]}>
+                {t(`trailer.types.${type}`)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={styles.label}>{t('handover.date')}</Text>
+        <TextInput style={styles.input} value={handoverDate} onChangeText={setHandoverDate}
+          placeholder="YYYY-MM-DD" placeholderTextColor={Colors.gray400} />
+
+        <Text style={styles.label}>{t('handover.time')}</Text>
+        <TextInput style={styles.input} value={handoverTime} onChangeText={setHandoverTime}
+          placeholder="HH:MM" placeholderTextColor={Colors.gray400} />
+
+        <Text style={styles.label}>{t('handover.equipment')}</Text>
+        <TextInput style={[styles.input, styles.textArea]} value={equipmentNotes}
+          onChangeText={setEquipmentNotes} placeholder={t('handover.equipmentNotes')}
+          placeholderTextColor={Colors.gray400} multiline numberOfLines={4} />
+      </ScrollView>
+    );
+  };
 
   const renderPhotosStep = () => (
     <TrailerTemplate
@@ -391,6 +575,93 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   textArea: { minHeight: 100, textAlignVertical: 'top' },
+  inputDisabled: { backgroundColor: Colors.gray100, color: Colors.gray500 },
+  searchContainer: { position: 'relative', zIndex: 20 },
+  searchInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: Spacing.sm,
+    zIndex: 20,
+  },
+  searchIcon: { marginRight: Spacing.xs },
+  searchInput: {
+    flex: 1,
+    paddingVertical: Spacing.md,
+    fontSize: FontSize.md,
+    color: Colors.text,
+  },
+  searchSpinner: { marginLeft: Spacing.xs },
+  clearBtn: { padding: Spacing.xs },
+  resultsDropdown: {
+    position: 'absolute',
+    top: 52,
+    left: 0,
+    right: 0,
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderTopWidth: 0,
+    borderBottomLeftRadius: BorderRadius.sm,
+    borderBottomRightRadius: BorderRadius.sm,
+    maxHeight: 240,
+    zIndex: 100,
+    elevation: 8,
+    shadowColor: Colors.black,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    overflow: 'hidden',
+  },
+  resultItem: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm + 2,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.border,
+  },
+  resultMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  resultReg: { fontSize: FontSize.md, fontWeight: '700', color: Colors.text },
+  resultMeta: { fontSize: FontSize.sm, color: Colors.textSecondary },
+  resultVin: { fontSize: FontSize.xs, color: Colors.gray400, marginTop: 2 },
+  resultHint: { fontSize: FontSize.sm, color: Colors.textSecondary, fontStyle: 'italic' },
+  resultItemManual: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm + 2,
+  },
+  resultManualText: { fontSize: FontSize.sm, color: Colors.primary, fontWeight: '600' },
+  selectedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginTop: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    backgroundColor: '#ecfdf5',
+    borderRadius: BorderRadius.sm,
+  },
+  selectedBadgeText: { fontSize: FontSize.xs, color: Colors.success, fontWeight: '600' },
+  manualBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginTop: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    backgroundColor: '#fffbeb',
+    borderRadius: BorderRadius.sm,
+  },
+  manualBadgeText: { fontSize: FontSize.xs, color: Colors.warning, fontWeight: '600' },
+  typeChipDisabled: { opacity: 0.5 },
   typeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   typeChip: {
     paddingHorizontal: Spacing.md,

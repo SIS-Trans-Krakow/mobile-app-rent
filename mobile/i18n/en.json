@@ -67,7 +67,13 @@
     "returned": "Returned",
     "created": "Handover created",
     "selectExisting": "Select existing",
-    "createNew": "Create new"
+    "createNew": "Create new",
+    "searchTrailerPlaceholder": "Enter registration number...",
+    "trailerFromDb": "Trailer from database",
+    "clearSelection": "Clear selection",
+    "noTrailersFound": "No trailers found",
+    "searching": "Searching...",
+    "manualEntry": "New trailer (manual entry)"
   },
   "trailer": {
     "types": {

@@ -22,6 +22,19 @@ interface TrailerResult {
   production_date: string;
 }
 
+const POSITION_LABELS: Record<PhotoPosition, string> = {
+  'front': 'photos.front',
+  'rear': 'photos.rear',
+  'left-side': 'photos.leftSide',
+  'right-side': 'photos.rightSide',
+  'top': 'photos.top',
+  'interior': 'photos.interior',
+  'front-left': 'photos.frontLeft',
+  'front-right': 'photos.frontRight',
+  'rear-left': 'photos.rearLeft',
+  'rear-right': 'photos.rearRight',
+};
+
 export default function NewHandoverScreen() {
   const { t } = useTranslation();
   const router = useRouter();
@@ -311,7 +324,13 @@ export default function NewHandoverScreen() {
             />
             {searchLoading && <ActivityIndicator size="small" color={Colors.primary} style={styles.searchSpinner} />}
             {isFromDb && (
-              <TouchableOpacity onPress={clearTrailerSelection} style={styles.clearBtn}>
+              <TouchableOpacity
+                onPress={clearTrailerSelection}
+                style={styles.clearBtn}
+                accessibilityRole="button"
+                accessible
+                accessibilityLabel={t('handover.clearSelection')}
+              >
                 <Ionicons name="close-circle" size={20} color={Colors.gray400} />
               </TouchableOpacity>
             )}
@@ -331,6 +350,9 @@ export default function NewHandoverScreen() {
                       key={trailer.id}
                       style={styles.resultItem}
                       onPress={() => selectTrailer(trailer)}
+                      accessibilityRole="button"
+                      accessible
+                      accessibilityLabel={`${trailer.registration_number}`}
                     >
                       <View style={styles.resultMain}>
                         <Text style={styles.resultReg}>{trailer.registration_number}</Text>
@@ -348,6 +370,9 @@ export default function NewHandoverScreen() {
                       setShowResults(false);
                       setSearchResults([]);
                     }}
+                    accessibilityRole="button"
+                    accessible
+                    accessibilityLabel={t('handover.manualEntry')}
                   >
                     <Ionicons name="add-circle-outline" size={18} color={Colors.primary} />
                     <Text style={styles.resultManualText}>{t('handover.manualEntry')}</Text>
@@ -365,6 +390,9 @@ export default function NewHandoverScreen() {
                       setShowResults(false);
                       setSearchResults([]);
                     }}
+                    accessibilityRole="button"
+                    accessible
+                    accessibilityLabel={t('handover.manualEntry')}
                   >
                     <Ionicons name="add-circle-outline" size={18} color={Colors.primary} />
                     <Text style={styles.resultManualText}>{t('handover.manualEntry')}</Text>
@@ -423,6 +451,10 @@ export default function NewHandoverScreen() {
               ]}
               onPress={isFromDb ? undefined : () => setTrailerType(type)}
               disabled={isFromDb}
+              accessibilityRole="button"
+              accessible
+              accessibilityLabel={t(`trailer.types.${type}`)}
+              accessibilityState={{ selected: trailerType === type, disabled: isFromDb }}
             >
               <Text style={[styles.typeChipText, trailerType === type && styles.typeChipTextActive]}>
                 {t(`trailer.types.${type}`)}
@@ -478,7 +510,7 @@ export default function NewHandoverScreen() {
         <View style={styles.preloadedBanner}>
           <Ionicons name="images-outline" size={16} color={Colors.warning} />
           <Text style={styles.preloadedBannerText}>
-            Zdjęcia z ostatniego zwrotu ({lastReturnDate}) zostały wstępnie dodane wraz z uszkodzeniami. Naciśnij strefę, aby podmienić lub edytować.
+            {t('handover.preloadedBanner', { date: lastReturnDate })}
           </Text>
         </View>
       )}
@@ -486,7 +518,7 @@ export default function NewHandoverScreen() {
         <View style={styles.issueBanner}>
           <Ionicons name="warning" size={16} color={Colors.danger} />
           <Text style={styles.issueBannerText}>
-            {issueCount} uszkodzenie(a) oznaczone na zdjęciach
+            {t('handover.issueCountBanner', { count: issueCount })}
           </Text>
         </View>
       )}
@@ -533,14 +565,16 @@ export default function NewHandoverScreen() {
         ) : null}
 
         <Text style={styles.sectionTitle}>{t('handover.photos')}</Text>
-        <Text style={styles.summaryDetail}>{photoEntries.length} zdjęć</Text>
+        <Text style={styles.summaryDetail}>{t('handover.photosCount', { count: photoEntries.length })}</Text>
 
         {issuePhotos.length > 0 && (
           <>
-            <Text style={[styles.sectionTitle, { color: Colors.danger }]}>Uszkodzenia ({issuePhotos.length})</Text>
+            <Text style={[styles.sectionTitle, { color: Colors.danger }]}>
+              {t('handover.issuesCount', { count: issuePhotos.length })}
+            </Text>
             {issuePhotos.map((p, i) => (
               <Text key={i} style={styles.issueItem}>
-                • {t(`photos.${p.position.replace('-', '')}`  as any) || p.position}: {p.issueDescription}
+                • {t(POSITION_LABELS[p.position])}: {p.issueDescription}
               </Text>
             ))}
           </>
@@ -550,7 +584,7 @@ export default function NewHandoverScreen() {
   };
 
   const steps = [renderCompanyStep, renderTrailerStep, renderPhotosStep, renderSummary];
-  const stepLabels = [t('handover.company'), t('handover.trailer'), t('handover.photos'), 'Podsumowanie'];
+  const stepLabels = [t('handover.company'), t('handover.trailer'), t('handover.photos'), t('handover.summary')];
 
   return (
     <View style={styles.container}>
@@ -574,7 +608,9 @@ export default function NewHandoverScreen() {
       <View style={styles.content}>
         <View style={styles.stepHeader}>
           <Text style={styles.stepHeaderTitle}>{stepLabels[step]}</Text>
-          <Text style={styles.stepHeaderSubtitle}>Krok {step + 1} z {steps.length}</Text>
+          <Text style={styles.stepHeaderSubtitle}>
+            {t('handover.stepOf', { current: step + 1, total: steps.length })}
+          </Text>
         </View>
         {steps[step]()}
       </View>
@@ -586,6 +622,10 @@ export default function NewHandoverScreen() {
             style={[styles.navBtnSecondary, loading && styles.navBtnDisabled]}
             onPress={() => setStep(step - 1)}
             disabled={loading}
+            accessibilityRole="button"
+            accessible
+            accessibilityLabel={t('common.back')}
+            accessibilityState={{ disabled: loading }}
           >
             <Text style={styles.navBtnSecondaryText}>{t('common.back')}</Text>
           </TouchableOpacity>
@@ -596,6 +636,10 @@ export default function NewHandoverScreen() {
             style={[styles.navBtn, loading && styles.navBtnDisabled]}
             onPress={handleNext}
             disabled={loading}
+            accessibilityRole="button"
+            accessible
+            accessibilityLabel={t('common.next')}
+            accessibilityState={{ disabled: loading }}
           >
             <Text style={styles.navBtnText}>{t('common.next')}</Text>
             <Ionicons name="chevron-forward" size={18} color={Colors.white} />
@@ -605,6 +649,10 @@ export default function NewHandoverScreen() {
             style={[styles.navBtn, { backgroundColor: Colors.success }, loading && styles.navBtnDisabled]}
             onPress={handleSubmit}
             disabled={loading}
+            accessibilityRole="button"
+            accessible
+            accessibilityLabel={t('common.submit')}
+            accessibilityState={{ disabled: loading }}
           >
             {loading ? (
               <ActivityIndicator color={Colors.white} />

@@ -77,7 +77,22 @@
     "clearSelection": "Wyczyść wybór",
     "noTrailersFound": "Nie znaleziono naczep",
     "searching": "Szukam...",
-    "manualEntry": "Nowa naczepa (wpis ręczny)"
+    "manualEntry": "Nowa naczepa (wpis ręczny)",
+    "summary": "Podsumowanie",
+    "stepOf": "Krok {{current}} z {{total}}",
+    "preloadedBanner": "Zdjęcia z ostatniego zwrotu ({{date}}) zostały wstępnie dodane wraz z uszkodzeniami. Naciśnij strefę, aby podmienić lub edytować.",
+    "issueCountBanner": "{{count}} uszkodzenie(a) oznaczone na zdjęciach",
+    "issuesCount": "Uszkodzenia ({{count}})",
+    "photosCount": "{{count}} zdjęć",
+    "savedPhotosCount": "Zapisane zdjęcia: {{count}}",
+    "noPhotosInHandover": "Brak zdjęć w tym przekazaniu.",
+    "deleteTitle": "Usuń przekazanie",
+    "deleteConfirm": "Ta operacja usunie przekazanie wraz ze zdjęciami i ewentualnym zwrotem. Czy kontynuować?",
+    "deleted": "Przekazanie usunięte",
+    "deleteFailed": "Nie udało się usunąć przekazania",
+    "acceptedBy": "Przyjął: {{name}}",
+    "photoComparison": "Porównanie zdjęć",
+    "pdfGenerateFailed": "Nie udało się wygenerować PDF"
   },
   "trailer": {
     "types": {
@@ -105,7 +120,9 @@
     "takePhoto": "Zrób zdjęcie",
     "pickFromGallery": "Wybierz z galerii",
     "description": "Opis zdjęcia",
-    "tapZone": "Dotknij strefę na szablonie aby dodać zdjęcie"
+    "tapZone": "Dotknij strefę na szablonie aby dodać zdjęcie",
+    "inheritedFromLastReturn": "↩ z ostatniego zwrotu",
+    "cameraPermissionRequired": "Wymagane uprawnienie do aparatu"
   },
   "return": {
     "title": "Zwrot naczepy",
@@ -126,7 +143,13 @@
     "comparison": "Porównanie",
     "original": "Przekazanie",
     "current": "Zwrot",
-    "created": "Zwrot zarejestrowany"
+    "created": "Zwrot zarejestrowany",
+    "missingPhotosForPositions": "Brak zdjęć zwrotu dla pozycji: {{positions}}",
+    "handoverIssueBanner": "{{count}} uszkodzenie(a) zgłoszone przy przekazaniu — widoczne na zdjęciach poniżej",
+    "requiredPhotosProgress": "Wymagane zdjęcia: {{required}}. Dodane: {{added}}.",
+    "missingPhotosTitle": "Brakujące zdjęcia:",
+    "changePhoto": "Zmień",
+    "fillMissingPhotos": "Uzupełnij brakujące zdjęcia"
   },
   "admin": {
     "users": "Użytkownicy",

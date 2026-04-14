@@ -15,6 +15,7 @@ interface HandoverItem {
   company_name: string;
   registration_number: string;
   trailer_type: string;
+  issue_count?: number;
 }
 
 export default function SelectHandoverScreen() {
@@ -70,6 +71,12 @@ export default function SelectHandoverScreen() {
             </View>
             <View style={styles.cardContent}>
               <Text style={styles.cardCompany}>{item.company_name}</Text>
+              {item.issue_count ? (
+                <View style={styles.issueBadge}>
+                  <Ionicons name="warning" size={12} color={Colors.white} />
+                  <Text style={styles.issueBadgeText}>{item.issue_count}</Text>
+                </View>
+              ) : null}
               <Text style={styles.cardTrailer}>
                 {item.registration_number} ({item.trailer_type})
               </Text>
@@ -104,6 +111,22 @@ const styles = StyleSheet.create({
   cardLeft: { marginRight: Spacing.md },
   cardContent: { flex: 1 },
   cardCompany: { fontSize: FontSize.md, fontWeight: '600', color: Colors.text },
+  issueBadge: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.warning,
+  },
+  issueBadgeText: {
+    color: Colors.white,
+    fontSize: FontSize.xs,
+    fontWeight: '700',
+  },
   cardTrailer: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 2 },
   cardDate: { fontSize: FontSize.xs, color: Colors.gray400, marginTop: 2 },
 });

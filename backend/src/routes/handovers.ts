@@ -37,7 +37,12 @@ router.get('/', (req: Request, res: Response) => {
   const { status } = req.query;
   let query = `
     SELECT h.*, c.name as company_name, t.registration_number, t.type as trailer_type,
-           t.production_date, u.full_name as created_by_name
+           t.production_date, u.full_name as created_by_name,
+           (
+             SELECT COUNT(*)
+             FROM handover_photos hp
+             WHERE hp.handover_id = h.id AND hp.has_issue = 1
+           ) as issue_count
     FROM handovers h
     JOIN companies c ON h.company_id = c.id
     JOIN trailers t ON h.trailer_id = t.id

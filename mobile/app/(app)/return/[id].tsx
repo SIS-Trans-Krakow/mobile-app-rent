@@ -94,7 +94,7 @@ export default function ReturnScreen() {
       const missingLabels = missingPositions.map((pos) => t(POSITION_LABELS[pos])).join(', ');
       Alert.alert(
         t('common.error'),
-        `Brak zdjęć zwrotu dla pozycji: ${missingLabels}`
+        t('return.missingPhotosForPositions', { positions: missingLabels })
       );
       return;
     }
@@ -156,7 +156,7 @@ export default function ReturnScreen() {
         ]);
       }
     } catch (err: any) {
-      const errMsg = err?.response?.data?.error || 'Error';
+      const errMsg = err?.response?.data?.error || t('common.error');
       if (Platform.OS === 'web') {
         window.alert(errMsg);
       } else {
@@ -187,6 +187,13 @@ export default function ReturnScreen() {
   const handoverIssueCount = Object.values(originalPhotos).filter((p) => p?.hasIssue).length;
   const requiredPositions = ALL_POSITIONS.filter((pos) => !!originalPhotos[pos]);
   const missingRequiredPositions = requiredPositions.filter((pos) => !returnPhotos[pos]);
+
+  const submitAccessibilityLabel =
+    missingRequiredPositions.length > 0
+      ? t('return.fillMissingPhotos')
+      : hasIssues
+        ? t('return.generateReport')
+        : t('common.submit');
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -225,8 +232,8 @@ export default function ReturnScreen() {
         {handover.has_documents !== undefined && (
           <Text style={styles.equipHint}>
             {t('handover.documents')}: {handover.has_documents ? t('common.yes') : t('common.no')} |{' '}
-            {t('handover.beams')}: {handover.beams_count ?? 0} szt. |{' '}
-            {t('handover.straps')}: {handover.straps_count ?? 0} szt.
+            {t('handover.beams')}: {handover.beams_count ?? 0} {t('handover.pcs')} |{' '}
+            {t('handover.straps')}: {handover.straps_count ?? 0} {t('handover.pcs')}
           </Text>
         )}
 
@@ -269,19 +276,22 @@ export default function ReturnScreen() {
         <View style={styles.handoverIssueBanner}>
           <Ionicons name="warning" size={16} color={Colors.danger} />
           <Text style={styles.handoverIssueBannerText}>
-            {handoverIssueCount} uszkodzenie(a) zgłoszone przy przekazaniu — widoczne na zdjęciach poniżej
+            {t('return.handoverIssueBanner', { count: handoverIssueCount })}
           </Text>
         </View>
       )}
       <Text style={styles.sectionTitle}>{t('return.comparison')}</Text>
       {requiredPositions.length > 0 && (
         <Text style={styles.requiredHint}>
-          Wymagane zdjęcia: {requiredPositions.length}. Dodane: {requiredPositions.length - missingRequiredPositions.length}.
+          {t('return.requiredPhotosProgress', {
+            required: requiredPositions.length,
+            added: requiredPositions.length - missingRequiredPositions.length,
+          })}
         </Text>
       )}
       {missingRequiredPositions.length > 0 && (
         <View style={styles.validationBox}>
-          <Text style={styles.validationTitle}>Brakujące zdjęcia:</Text>
+          <Text style={styles.validationTitle}>{t('return.missingPhotosTitle')}</Text>
           <Text style={styles.validationText}>
             {missingRequiredPositions.map((pos) => t(POSITION_LABELS[pos])).join(', ')}
           </Text>
@@ -307,6 +317,9 @@ export default function ReturnScreen() {
                     })}
                     activeOpacity={0.85}
                     style={original.hasIssue ? styles.issueContainer : undefined}
+                    accessibilityRole="button"
+                    accessible
+                    accessibilityLabel={`${t('return.original')}: ${t(POSITION_LABELS[pos])}`}
                   >
                     <Image source={{ uri: original.uri }} style={styles.comparisonImg} />
                     <View style={styles.expandBadge}>
@@ -339,12 +352,23 @@ export default function ReturnScreen() {
                   ]}
                   onPress={() => {
                     if (returnPhoto) {
-                      setLightboxPhoto({ uri: returnPhoto.uri, label: t(POSITION_LABELS[pos]), description: returnPhoto.issueDescription });
+                      setLightboxPhoto({
+                        uri: returnPhoto.uri,
+                        label: t(POSITION_LABELS[pos]),
+                        description: returnPhoto.hasIssue ? returnPhoto.issueDescription : returnPhoto.description,
+                      });
                     } else {
                       handleZonePress(pos);
                     }
                   }}
                   onLongPress={() => handleZonePress(pos)}
+                  accessibilityRole="button"
+                  accessible
+                  accessibilityLabel={
+                    returnPhoto
+                      ? `${t('return.current')}: ${t(POSITION_LABELS[pos])}`
+                      : `${t('photos.takePhoto')}, ${t(POSITION_LABELS[pos])}`
+                  }
                 >
                   {returnPhoto ? (
                     <>
@@ -352,6 +376,11 @@ export default function ReturnScreen() {
                       <View style={styles.expandBadge}>
                         <Ionicons name="expand-outline" size={12} color={Colors.white} />
                       </View>
+                      {returnPhoto.hasIssue && (
+                        <View style={styles.origIssueBadge}>
+                          <Text style={styles.origIssueBadgeText}>!</Text>
+                        </View>
+                      )}
                     </>
                   ) : (
                     <View style={styles.addPhotoBtn}>
@@ -361,14 +390,22 @@ export default function ReturnScreen() {
                   )}
                 </TouchableOpacity>
                 {returnPhoto && (
-                  <TouchableOpacity onPress={() => handleZonePress(pos)} style={styles.editPhotoLink}>
+                  <TouchableOpacity
+                    onPress={() => handleZonePress(pos)}
+                    style={styles.editPhotoLink}
+                    accessibilityRole="button"
+                    accessible
+                    accessibilityLabel={t('return.changePhoto')}
+                  >
                     <Ionicons name="pencil-outline" size={12} color={Colors.primary} />
-                    <Text style={styles.editPhotoText}>Zmień</Text>
+                    <Text style={styles.editPhotoText}>{t('return.changePhoto')}</Text>
                   </TouchableOpacity>
                 )}
-                {returnPhoto?.hasIssue && (
+                {returnPhoto?.hasIssue && returnPhoto.issueDescription ? (
                   <Text style={styles.issueText}>{returnPhoto.issueDescription}</Text>
-                )}
+                ) : returnPhoto?.description ? (
+                  <Text style={styles.compDesc}>{returnPhoto.description}</Text>
+                ) : null}
               </View>
             </View>
           </View>
@@ -391,6 +428,12 @@ export default function ReturnScreen() {
         ]}
         onPress={handleSubmit}
         disabled={submitting || missingRequiredPositions.length > 0}
+        accessibilityRole="button"
+        accessible
+        accessibilityLabel={submitAccessibilityLabel}
+        accessibilityState={{
+          disabled: submitting || missingRequiredPositions.length > 0,
+        }}
       >
         {submitting ? (
           <ActivityIndicator color={Colors.white} />
@@ -399,7 +442,7 @@ export default function ReturnScreen() {
             <Ionicons name="checkmark-circle" size={22} color={Colors.white} />
             <Text style={styles.submitText}>
               {missingRequiredPositions.length > 0
-                ? 'Uzupełnij brakujące zdjęcia'
+                ? t('return.fillMissingPhotos')
                 : hasIssues
                   ? t('return.generateReport')
                   : t('common.submit')}

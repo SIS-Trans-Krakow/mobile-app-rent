@@ -16,6 +16,7 @@ interface HandoverItem {
   registration_number: string;
   trailer_type: string;
   status: string;
+  issue_count?: number;
 }
 
 export default function HandoverListScreen() {
@@ -65,13 +66,21 @@ export default function HandoverListScreen() {
           >
             <View style={styles.cardHeader}>
               <Text style={styles.cardId}>#{item.id}</Text>
-              <View style={[
-                styles.badge,
-                item.status === 'active' ? styles.badgeActive : styles.badgeReturned,
-              ]}>
-                <Text style={styles.badgeText}>
-                  {item.status === 'active' ? t('handover.active') : t('handover.returned')}
-                </Text>
+              <View style={styles.cardHeaderRight}>
+                {item.issue_count ? (
+                  <View style={styles.issueBadge}>
+                    <Ionicons name="warning" size={12} color={Colors.white} />
+                    <Text style={styles.issueBadgeText}>{item.issue_count}</Text>
+                  </View>
+                ) : null}
+                <View style={[
+                  styles.badge,
+                  item.status === 'active' ? styles.badgeActive : styles.badgeReturned,
+                ]}>
+                  <Text style={styles.badgeText}>
+                    {item.status === 'active' ? t('handover.active') : t('handover.returned')}
+                  </Text>
+                </View>
               </View>
             </View>
             <Text style={styles.cardCompany}>{item.company_name}</Text>
@@ -119,6 +128,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: Spacing.xs,
   },
+  cardHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
   cardId: { fontSize: FontSize.sm, fontWeight: '700', color: Colors.primary },
   badge: {
     paddingHorizontal: Spacing.sm,
@@ -128,6 +142,20 @@ const styles = StyleSheet.create({
   badgeActive: { backgroundColor: '#dcfce7' },
   badgeReturned: { backgroundColor: Colors.gray100 },
   badgeText: { fontSize: FontSize.xs, fontWeight: '600' },
+  issueBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.warning,
+  },
+  issueBadgeText: {
+    color: Colors.white,
+    fontSize: FontSize.xs,
+    fontWeight: '700',
+  },
   cardCompany: { fontSize: FontSize.md, fontWeight: '600', color: Colors.text, marginBottom: Spacing.xs },
   cardRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, marginTop: 2 },
   cardDetail: { fontSize: FontSize.sm, color: Colors.textSecondary },

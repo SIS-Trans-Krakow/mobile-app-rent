@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Image, StyleSheet,
   Modal, Alert, Switch,
@@ -36,18 +36,34 @@ export default function PhotoCapture({
   position, visible, onClose, onSave, existingPhoto, showIssueFields, originalPhoto,
 }: Props) {
   const { t } = useTranslation();
-  const fallbackIssue = !existingPhoto && originalPhoto?.hasIssue;
-  const [uri, setUri] = useState(existingPhoto?.uri || '');
-  const [description, setDescription] = useState(existingPhoto?.description || '');
-  const [hasIssue, setHasIssue] = useState(existingPhoto?.hasIssue || fallbackIssue || false);
-  const [issueDescription, setIssueDescription] = useState(
-    existingPhoto?.issueDescription || (fallbackIssue ? originalPhoto?.issueDescription : '') || ''
-  );
+  const buildInitialState = () => {
+    const fallbackIssue = !existingPhoto && originalPhoto?.hasIssue;
+    return {
+      uri: existingPhoto?.uri || '',
+      description: existingPhoto?.description || '',
+      hasIssue: existingPhoto?.hasIssue || fallbackIssue || false,
+      issueDescription: existingPhoto?.issueDescription || (fallbackIssue ? originalPhoto?.issueDescription : '') || '',
+    };
+  };
+
+  const [uri, setUri] = useState(buildInitialState().uri);
+  const [description, setDescription] = useState(buildInitialState().description);
+  const [hasIssue, setHasIssue] = useState(buildInitialState().hasIssue);
+  const [issueDescription, setIssueDescription] = useState(buildInitialState().issueDescription);
+
+  useEffect(() => {
+    if (!visible) return;
+    const initial = buildInitialState();
+    setUri(initial.uri);
+    setDescription(initial.description);
+    setHasIssue(initial.hasIssue);
+    setIssueDescription(initial.issueDescription);
+  }, [visible, existingPhoto, originalPhoto]);
 
   const takePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert(t('common.error'), 'Camera permission required');
+      Alert.alert(t('common.error'), t('photos.cameraPermissionRequired'));
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
@@ -88,11 +104,21 @@ export default function PhotoCapture({
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <View style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={onClose}>
+          <TouchableOpacity
+            onPress={onClose}
+            accessibilityRole="button"
+            accessible
+            accessibilityLabel={t('common.cancel')}
+          >
             <Ionicons name="close" size={28} color={Colors.text} />
           </TouchableOpacity>
           <Text style={styles.title}>{t(POSITION_LABELS[position])}</Text>
-          <TouchableOpacity onPress={handleSave}>
+          <TouchableOpacity
+            onPress={handleSave}
+            accessibilityRole="button"
+            accessible
+            accessibilityLabel={t('common.save')}
+          >
             <Text style={styles.saveText}>{t('common.save')}</Text>
           </TouchableOpacity>
         </View>
@@ -102,7 +128,9 @@ export default function PhotoCapture({
             <Text style={styles.sectionLabel}>{t('return.original')}:</Text>
             <Image source={{ uri: originalPhoto.uri }} style={styles.originalImage} />
             {originalPhoto.hasIssue && originalPhoto.issueDescription ? (
-              <Text style={styles.originalIssueDesc}>Uszkodzenie: {originalPhoto.issueDescription}</Text>
+              <Text style={styles.originalIssueDesc}>
+                {t('return.issueDescription')}: {originalPhoto.issueDescription}
+              </Text>
             ) : originalPhoto.description ? (
               <Text style={styles.originalDesc}>{originalPhoto.description}</Text>
             ) : null}
@@ -120,11 +148,23 @@ export default function PhotoCapture({
         </View>
 
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.actionBtn} onPress={takePhoto}>
+          <TouchableOpacity
+            style={styles.actionBtn}
+            onPress={takePhoto}
+            accessibilityRole="button"
+            accessible
+            accessibilityLabel={t('photos.takePhoto')}
+          >
             <Ionicons name="camera" size={22} color={Colors.white} />
             <Text style={styles.actionText}>{t('photos.takePhoto')}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionBtn, { backgroundColor: Colors.secondary }]} onPress={pickImage}>
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: Colors.secondary }]}
+            onPress={pickImage}
+            accessibilityRole="button"
+            accessible
+            accessibilityLabel={t('photos.pickFromGallery')}
+          >
             <Ionicons name="images" size={22} color={Colors.white} />
             <Text style={styles.actionText}>{t('photos.pickFromGallery')}</Text>
           </TouchableOpacity>

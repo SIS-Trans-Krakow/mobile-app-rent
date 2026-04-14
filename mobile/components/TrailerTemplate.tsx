@@ -30,7 +30,6 @@ interface Props {
   photos: Record<string, ZonePhoto | undefined>;
   onZonePress: (position: PhotoPosition) => void;
   readOnly?: boolean;
-  originalPhotos?: Record<string, ZonePhoto | undefined>;
   onPhotoPress?: (photo: ZonePhoto) => void;
 }
 
@@ -53,7 +52,7 @@ export const ALL_POSITIONS: PhotoPosition[] = [
   'rear-left', 'rear-right',
 ];
 
-export default function TrailerTemplate({ photos, onZonePress, readOnly, originalPhotos, onPhotoPress }: Props) {
+export default function TrailerTemplate({ photos, onZonePress, readOnly, onPhotoPress }: Props) {
   const { t } = useTranslation();
 
   const renderZone = (position: PhotoPosition, style?: object) => {
@@ -70,6 +69,9 @@ export default function TrailerTemplate({ photos, onZonePress, readOnly, origina
       }
     };
 
+    const zoneLabel = t(POSITION_LABELS[position]);
+    const zoneA11yLabel = readOnly ? zoneLabel : `${zoneLabel}. ${t('photos.tapZone')}`;
+
     return (
       <TouchableOpacity
         key={position}
@@ -82,6 +84,10 @@ export default function TrailerTemplate({ photos, onZonePress, readOnly, origina
         ]}
         onPress={handlePress}
         disabled={readOnly && !hasPhoto}
+        accessibilityRole="button"
+        accessible
+        accessibilityLabel={zoneA11yLabel}
+        accessibilityState={{ disabled: readOnly && !hasPhoto }}
       >
         {hasPhoto ? (
           <Image source={{ uri: photo.uri }} style={styles.zoneImage} />
@@ -157,12 +163,16 @@ export default function TrailerTemplate({ photos, onZonePress, readOnly, origina
           onPress={() => onPhotoPress && onPhotoPress(photo!)}
           disabled={!onPhotoPress}
           activeOpacity={onPhotoPress ? 0.7 : 1}
+          accessibilityRole="button"
+          accessible={!!onPhotoPress}
+          accessibilityLabel={t(POSITION_LABELS[pos as PhotoPosition])}
+          accessibilityState={{ disabled: !onPhotoPress }}
         >
           <Image source={{ uri: photo!.uri }} style={styles.thumbSmall} />
           <View style={styles.photoDescContent}>
             <Text style={styles.photoDescLabel}>{t(POSITION_LABELS[pos as PhotoPosition])}</Text>
             {photo!.isPreloaded && (
-              <Text style={styles.preloadedLabel}>↩ z ostatniego zwrotu</Text>
+              <Text style={styles.preloadedLabel}>{t('photos.inheritedFromLastReturn')}</Text>
             )}
             {photo!.description ? <Text style={styles.photoDescText}>{photo!.description}</Text> : null}
             {photo!.hasIssue && (

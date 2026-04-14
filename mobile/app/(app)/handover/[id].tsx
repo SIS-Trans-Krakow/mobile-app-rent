@@ -63,7 +63,7 @@ export default function HandoverDetailScreen() {
         await Linking.openURL(url);
       }
     } catch (err) {
-      Alert.alert(t('common.error'), 'Could not generate PDF');
+      Alert.alert(t('common.error'), t('handover.pdfGenerateFailed'));
     }
   };
 
@@ -71,13 +71,13 @@ export default function HandoverDetailScreen() {
     if (deleting) return;
     if (Platform.OS === 'web') {
       const confirmed = window.confirm(
-        'Ta operacja usunie przekazanie wraz ze zdjęciami i ewentualnym zwrotem. Czy kontynuować?'
+        t('handover.deleteConfirm')
       );
       if (confirmed) handleDelete();
     } else {
       Alert.alert(
-        'Usuń przekazanie',
-        'Ta operacja usunie przekazanie wraz ze zdjęciami i ewentualnym zwrotem. Czy kontynuować?',
+        t('handover.deleteTitle'),
+        t('handover.deleteConfirm'),
         [
           { text: t('common.cancel'), style: 'cancel' },
           { text: t('common.delete'), style: 'destructive', onPress: handleDelete },
@@ -92,13 +92,13 @@ export default function HandoverDetailScreen() {
     try {
       await api.delete(`/handovers/${id}`);
       if (Platform.OS === 'web') {
-        window.alert('Przekazanie usunięte');
+        window.alert(t('handover.deleted'));
       } else {
-        Alert.alert(t('common.success'), 'Przekazanie usunięte');
+        Alert.alert(t('common.success'), t('handover.deleted'));
       }
       router.replace('/(app)/handover');
     } catch (err: any) {
-      const msg = err?.response?.data?.error || 'Nie udało się usunąć przekazania';
+      const msg = err?.response?.data?.error || t('handover.deleteFailed');
       if (Platform.OS === 'web') {
         window.alert(msg);
       } else {
@@ -230,7 +230,7 @@ export default function HandoverDetailScreen() {
           <View style={styles.issueSectionHeader}>
             <Ionicons name="warning" size={16} color={Colors.danger} />
             <Text style={[styles.sectionTitle, { marginBottom: 0, color: Colors.danger }]}>
-              Uszkodzenia ({handoverIssues.length})
+              {t('handover.issuesCount', { count: handoverIssues.length })}
             </Text>
           </View>
           {handoverIssues.map((p: any, i: number) => {
@@ -265,13 +265,13 @@ export default function HandoverDetailScreen() {
           <View style={styles.returnHeader}>
             <Ionicons name="return-down-back" size={16} color={Colors.primary} />
             <Text style={[styles.sectionTitle, { marginBottom: 0, color: Colors.primary }]}>
-              Zwrot
+              {t('return.title')}
             </Text>
           </View>
           <Text style={styles.value}>{ret.return_date} {ret.return_time}</Text>
           {ret.notes ? <Text style={styles.detail}>{ret.notes}</Text> : null}
           {ret.created_by_name ? (
-            <Text style={styles.detail}>Przyjął: {ret.created_by_name}</Text>
+            <Text style={styles.detail}>{t('handover.acceptedBy', { name: ret.created_by_name })}</Text>
           ) : null}
         </View>
       )}
@@ -279,10 +279,10 @@ export default function HandoverDetailScreen() {
       {/* Photo comparison when returned */}
       {ret && comparisonPositions.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Porównanie zdjęć</Text>
+          <Text style={styles.sectionTitle}>{t('handover.photoComparison')}</Text>
           <View style={styles.compLegend}>
-            <Text style={styles.compLegendItem}>Przekazanie</Text>
-            <Text style={styles.compLegendItem}>Zwrot</Text>
+            <Text style={styles.compLegendItem}>{t('return.original')}</Text>
+            <Text style={styles.compLegendItem}>{t('return.current')}</Text>
           </View>
           {comparisonPositions.map((pos) => {
             const orig = photos[pos];
@@ -364,19 +364,19 @@ export default function HandoverDetailScreen() {
       {!ret && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('handover.photos')}</Text>
-          <Text style={styles.photosMeta}>Zapisane zdjęcia: {photoCount}</Text>
+          <Text style={styles.photosMeta}>{t('handover.savedPhotosCount', { count: photoCount })}</Text>
           <TrailerTemplate
             photos={photos}
             onZonePress={() => {}}
             onPhotoPress={(photo) => setLightboxPhoto({
               uri: photo.uri,
-              label: photo.position,
+              label: t(POSITION_LABELS[photo.position]),
               description: photo.hasIssue ? photo.issueDescription : photo.description,
             })}
             readOnly
           />
           {photoCount === 0 && (
-            <Text style={styles.emptyPhotosText}>Brak zdjęć w tym przekazaniu.</Text>
+            <Text style={styles.emptyPhotosText}>{t('handover.noPhotosInHandover')}</Text>
           )}
         </View>
       )}

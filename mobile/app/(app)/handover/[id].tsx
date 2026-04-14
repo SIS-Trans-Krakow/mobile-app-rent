@@ -131,9 +131,12 @@ export default function HandoverDetailScreen() {
       uri: getUploadsUrl(photo.file_path),
       position: photo.position_on_template,
       description: photo.description,
+      hasIssue: !!photo.has_issue,
+      issueDescription: photo.issue_description || '',
     };
   }
   const photoCount = Object.keys(photos).length;
+  const handoverIssues = (handover.photos || []).filter((p: any) => p.has_issue);
 
   const ret = handover.return;
   const returnPhotos: Record<string, ZonePhoto | undefined> = {};
@@ -221,6 +224,41 @@ export default function HandoverDetailScreen() {
         </View>
       ) : null}
 
+      {/* Handover issues */}
+      {handoverIssues.length > 0 && (
+        <View style={[styles.section, styles.issueSection]}>
+          <View style={styles.issueSectionHeader}>
+            <Ionicons name="warning" size={16} color={Colors.danger} />
+            <Text style={[styles.sectionTitle, { marginBottom: 0, color: Colors.danger }]}>
+              Uszkodzenia ({handoverIssues.length})
+            </Text>
+          </View>
+          {handoverIssues.map((p: any, i: number) => {
+            const posLabel = POSITION_LABELS[p.position_on_template as PhotoPosition];
+            return (
+              <View key={i} style={styles.issueRow}>
+                <TouchableOpacity
+                  style={styles.issueThumbWrap}
+                  onPress={() => setLightboxPhoto({
+                    uri: getUploadsUrl(p.file_path),
+                    label: posLabel ? t(posLabel) : p.position_on_template,
+                    description: p.issue_description,
+                  })}
+                >
+                  <Image source={{ uri: getUploadsUrl(p.file_path) }} style={styles.issueThumb} />
+                </TouchableOpacity>
+                <View style={styles.issueContent}>
+                  <Text style={styles.issuePosition}>
+                    {posLabel ? t(posLabel) : p.position_on_template}
+                  </Text>
+                  <Text style={styles.issueDescription}>{p.issue_description}</Text>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      )}
+
       {/* Return info (when returned) */}
       {ret && (
         <View style={[styles.section, styles.returnSection]}>
@@ -258,13 +296,21 @@ export default function HandoverDetailScreen() {
                     {orig ? (
                       <TouchableOpacity
                         activeOpacity={0.85}
-                        onPress={() => setLightboxPhoto({ uri: orig.uri, label: t(POSITION_LABELS[pos]), description: orig.description })}
+                        style={orig.hasIssue ? styles.issueImgContainer : undefined}
+                        onPress={() => setLightboxPhoto({ uri: orig.uri, label: t(POSITION_LABELS[pos]), description: orig.hasIssue ? orig.issueDescription : orig.description })}
                       >
                         <Image source={{ uri: orig.uri }} style={styles.compImg} />
                         <View style={styles.expandBadge}>
                           <Ionicons name="expand-outline" size={12} color={Colors.white} />
                         </View>
-                        {orig.description ? (
+                        {orig.hasIssue && (
+                          <View style={styles.issueBadge}>
+                            <Text style={styles.issueBadgeText}>!</Text>
+                          </View>
+                        )}
+                        {orig.hasIssue && orig.issueDescription ? (
+                          <Text style={styles.issueDesc}>{orig.issueDescription}</Text>
+                        ) : orig.description ? (
                           <Text style={styles.compImgDesc}>{orig.description}</Text>
                         ) : null}
                       </TouchableOpacity>
@@ -322,7 +368,11 @@ export default function HandoverDetailScreen() {
           <TrailerTemplate
             photos={photos}
             onZonePress={() => {}}
-            onPhotoPress={(photo) => setLightboxPhoto({ uri: photo.uri, label: photo.position, description: photo.description })}
+            onPhotoPress={(photo) => setLightboxPhoto({
+              uri: photo.uri,
+              label: photo.position,
+              description: photo.hasIssue ? photo.issueDescription : photo.description,
+            })}
             readOnly
           />
           {photoCount === 0 && (
@@ -499,6 +549,50 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  issueSection: {
+    borderColor: Colors.danger,
+    borderLeftWidth: 3,
+  },
+  issueSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginBottom: Spacing.sm,
+  },
+  issueRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginBottom: Spacing.sm,
+    paddingBottom: Spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.border,
+  },
+  issueThumbWrap: {
+    borderWidth: 2,
+    borderColor: Colors.danger,
+    borderRadius: BorderRadius.sm,
+    overflow: 'hidden',
+  },
+  issueThumb: {
+    width: 60,
+    height: 60,
+    borderRadius: BorderRadius.sm - 2,
+  },
+  issueContent: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  issuePosition: {
+    fontSize: FontSize.sm,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  issueDescription: {
+    fontSize: FontSize.sm,
+    color: Colors.danger,
+    fontWeight: '500',
+    marginTop: 2,
   },
   pdfBtn: {
     flexDirection: 'row',

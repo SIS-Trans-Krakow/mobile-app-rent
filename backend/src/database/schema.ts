@@ -25,6 +25,7 @@ export function getDb(): Database.Database {
     initSchema(db);
     migrateHandoversEquipmentFields(db);
     migrateReturnsEquipmentFields(db);
+    migrateHandoverPhotosIssueFields(db);
   }
   return db;
 }
@@ -216,5 +217,24 @@ function migrateReturnsEquipmentFields(db: Database.Database): void {
   if (!names.includes('return_straps_count')) {
     db.exec('ALTER TABLE returns ADD COLUMN return_straps_count INTEGER NOT NULL DEFAULT 0');
     console.log('[db] returns: added return_straps_count');
+  }
+}
+
+function migrateHandoverPhotosIssueFields(db: Database.Database): void {
+  const tableExists = db.prepare(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='handover_photos'"
+  ).get();
+  if (!tableExists) return;
+
+  const columns = db.prepare('PRAGMA table_info(handover_photos)').all() as Array<{ name: string }>;
+  const names = columns.map((c) => c.name);
+
+  if (!names.includes('has_issue')) {
+    db.exec('ALTER TABLE handover_photos ADD COLUMN has_issue INTEGER NOT NULL DEFAULT 0');
+    console.log('[db] handover_photos: added has_issue');
+  }
+  if (!names.includes('issue_description')) {
+    db.exec("ALTER TABLE handover_photos ADD COLUMN issue_description TEXT NOT NULL DEFAULT ''");
+    console.log('[db] handover_photos: added issue_description');
   }
 }

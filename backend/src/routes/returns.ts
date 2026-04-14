@@ -10,11 +10,12 @@ const router = Router();
 router.use(authenticate);
 
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png']);
+const ALLOWED_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png']);
 
 const storage = multer.diskStorage({
   destination: path.join(__dirname, '..', '..', 'uploads'),
   filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname);
+    const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
     cb(null, `${uuidv4()}${ext}`);
   },
 });
@@ -22,7 +23,7 @@ const upload = multer({
   storage,
   limits: { fileSize: 20 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (ALLOWED_MIME_TYPES.has(file.mimetype)) {
+    if (ALLOWED_MIME_TYPES.has(file.mimetype) || file.mimetype === 'application/octet-stream') {
       cb(null, true);
     } else {
       cb(new Error(`Niedozwolony format pliku: ${file.mimetype}. Dozwolone: jpg, jpeg, png`));

@@ -11,11 +11,12 @@ const router = Router();
 router.use(authenticate);
 
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png']);
+const ALLOWED_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png']);
 
 const storage = multer.diskStorage({
   destination: path.join(__dirname, '..', '..', 'uploads'),
   filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname);
+    const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
     cb(null, `${uuidv4()}${ext}`);
   },
 });
@@ -23,7 +24,7 @@ const upload = multer({
   storage,
   limits: { fileSize: 20 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (ALLOWED_MIME_TYPES.has(file.mimetype)) {
+    if (ALLOWED_MIME_TYPES.has(file.mimetype) || file.mimetype === 'application/octet-stream') {
       cb(null, true);
     } else {
       cb(new Error(`Niedozwolony format pliku: ${file.mimetype}. Dozwolone: jpg, jpeg, png`));
@@ -104,7 +105,9 @@ router.post('/', upload.array('photos', 20), async (req: Request, res: Response)
       handover_date, handover_time, equipment_notes,
       has_documents, beams_count, straps_count,
       photo_positions, photo_descriptions,
+      photo_has_issues, photo_issue_descriptions,
       inherited_photo_filenames, inherited_photo_positions, inherited_photo_descriptions,
+      inherited_photo_has_issues, inherited_photo_issue_descriptions,
     } = req.body;
 
     const normalizedCompanyName = (company_name || '').trim();
@@ -178,15 +181,19 @@ router.post('/', upload.array('photos', 20), async (req: Request, res: Response)
     );
     const handoverId = Number(handoverResult.lastInsertRowid);
 
+    const toArray = (v: any) => Array.isArray(v) ? v : v ? [v] : [];
+
     const files = (req.files as Express.Multer.File[]) || [];
-    const positions = Array.isArray(photo_positions) ? photo_positions : photo_positions ? [photo_positions] : [];
-    const descriptions = Array.isArray(photo_descriptions) ? photo_descriptions : photo_descriptions ? [photo_descriptions] : [];
+    const positions = toArray(photo_positions);
+    const descriptions = toArray(photo_descriptions);
+    const hasIssues = toArray(photo_has_issues);
+    const issueDescs = toArray(photo_issue_descriptions);
 
     const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads');
     await Promise.all(files.map(f => convertToPdfCompatibleJpeg(path.join(UPLOADS_DIR, f.filename))));
 
     const insertPhoto = db.prepare(
-      'INSERT INTO handover_photos (handover_id, file_path, position_on_template, description) VALUES (?, ?, ?, ?)'
+      'INSERT INTO handover_photos (handover_id, file_path, position_on_template, description, has_issue, issue_description) VALUES (?, ?, ?, ?, ?, ?)'
     );
 
     for (let i = 0; i < files.length; i++) {
@@ -194,22 +201,20 @@ router.post('/', upload.array('photos', 20), async (req: Request, res: Response)
         handoverId,
         files[i].filename,
         positions[i] || 'front',
-        descriptions[i] || ''
+        descriptions[i] || '',
+        hasIssues[i] === '1' || hasIssues[i] === 'true' ? 1 : 0,
+        issueDescs[i] || ''
       );
     }
 
-    const inheritedFilenames = Array.isArray(inherited_photo_filenames)
-      ? inherited_photo_filenames
-      : inherited_photo_filenames ? [inherited_photo_filenames] : [];
-    const inheritedPositions = Array.isArray(inherited_photo_positions)
-      ? inherited_photo_positions
-      : inherited_photo_positions ? [inherited_photo_positions] : [];
-    const inheritedDescriptions = Array.isArray(inherited_photo_descriptions)
-      ? inherited_photo_descriptions
-      : inherited_photo_descriptions ? [inherited_photo_descriptions] : [];
+    const inhFilenames = toArray(inherited_photo_filenames);
+    const inhPositions = toArray(inherited_photo_positions);
+    const inhDescriptions = toArray(inherited_photo_descriptions);
+    const inhHasIssues = toArray(inherited_photo_has_issues);
+    const inhIssueDescs = toArray(inherited_photo_issue_descriptions);
 
-    for (let i = 0; i < inheritedFilenames.length; i++) {
-      const originalFilename = inheritedFilenames[i];
+    for (let i = 0; i < inhFilenames.length; i++) {
+      const originalFilename = inhFilenames[i];
       const originalPath = path.join(UPLOADS_DIR, originalFilename);
       if (fs.existsSync(originalPath)) {
         const ext = path.extname(originalFilename);
@@ -219,8 +224,10 @@ router.post('/', upload.array('photos', 20), async (req: Request, res: Response)
         insertPhoto.run(
           handoverId,
           newFilename,
-          inheritedPositions[i] || 'front',
-          inheritedDescriptions[i] || ''
+          inhPositions[i] || 'front',
+          inhDescriptions[i] || '',
+          inhHasIssues[i] === '1' || inhHasIssues[i] === 'true' ? 1 : 0,
+          inhIssueDescs[i] || ''
         );
       }
     }

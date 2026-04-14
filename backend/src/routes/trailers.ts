@@ -54,7 +54,7 @@ router.get('/:id/last-return-photos', (req: Request, res: Response) => {
   }
 
   const photos = db.prepare(
-    'SELECT file_path, position_on_template, description FROM return_photos WHERE return_id = ? ORDER BY id'
+    'SELECT file_path, position_on_template, description, has_issue, issue_description FROM return_photos WHERE return_id = ? ORDER BY id'
   ).all(lastReturn.id);
 
   res.json({ photos, return_date: lastReturn.return_date });

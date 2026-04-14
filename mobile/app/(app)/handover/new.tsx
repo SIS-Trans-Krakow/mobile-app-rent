@@ -109,8 +109,14 @@ export default function NewHandoverScreen() {
 
     try {
       const res = await api.get(`/trailers/${trailer.id}/last-return-photos`);
-      const returnPhotos: Array<{ file_path: string; position_on_template: string; description: string }> =
-        res.data.photos || [];
+      const returnPhotos: Array<{
+        file_path: string;
+        position_on_template: string;
+        description: string;
+        has_issue: number;
+        issue_description: string;
+      }> = res.data.photos || [];
+
       if (returnPhotos.length > 0) {
         const preloaded: Record<string, ZonePhoto> = {};
         for (const p of returnPhotos) {
@@ -118,6 +124,8 @@ export default function NewHandoverScreen() {
             uri: getUploadsUrl(p.file_path),
             position: p.position_on_template as PhotoPosition,
             description: p.description || '',
+            hasIssue: !!p.has_issue,
+            issueDescription: p.issue_description || '',
             isPreloaded: true,
             preloadedFilePath: p.file_path,
           };
@@ -152,7 +160,10 @@ export default function NewHandoverScreen() {
   };
 
   const handlePhotoSave = (photo: ZonePhoto) => {
-    setPhotos((prev) => ({ ...prev, [photo.position]: { ...photo, isPreloaded: false, preloadedFilePath: undefined } }));
+    setPhotos((prev) => ({
+      ...prev,
+      [photo.position]: { ...photo, isPreloaded: false, preloadedFilePath: undefined },
+    }));
   };
 
   const validateStep = (): boolean => {
@@ -205,6 +216,8 @@ export default function NewHandoverScreen() {
           formData.append('inherited_photo_filenames', photo.preloadedFilePath);
           formData.append('inherited_photo_positions', photo.position);
           formData.append('inherited_photo_descriptions', photo.description || '');
+          formData.append('inherited_photo_has_issues', photo.hasIssue ? '1' : '0');
+          formData.append('inherited_photo_issue_descriptions', photo.issueDescription || '');
         } else {
           const filename = photo.uri.split('/').pop() || 'photo.jpg';
           if (Platform.OS === 'web') {
@@ -217,6 +230,8 @@ export default function NewHandoverScreen() {
           }
           formData.append('photo_positions', photo.position);
           formData.append('photo_descriptions', photo.description || '');
+          formData.append('photo_has_issues', photo.hasIssue ? '1' : '0');
+          formData.append('photo_issue_descriptions', photo.issueDescription || '');
         }
       }
 
@@ -455,13 +470,23 @@ export default function NewHandoverScreen() {
     );
   };
 
+  const issueCount = Object.values(photos).filter((p) => p?.hasIssue).length;
+
   const renderPhotosStep = () => (
     <View style={{ flex: 1 }}>
       {lastReturnDate && (
         <View style={styles.preloadedBanner}>
           <Ionicons name="images-outline" size={16} color={Colors.warning} />
           <Text style={styles.preloadedBannerText}>
-            Zdjęcia startowe z ostatniego zwrotu ({lastReturnDate}) zostały wstępnie dodane. Naciśnij strefę, aby podmienić.
+            Zdjęcia z ostatniego zwrotu ({lastReturnDate}) zostały wstępnie dodane wraz z uszkodzeniami. Naciśnij strefę, aby podmienić lub edytować.
+          </Text>
+        </View>
+      )}
+      {issueCount > 0 && (
+        <View style={styles.issueBanner}>
+          <Ionicons name="warning" size={16} color={Colors.danger} />
+          <Text style={styles.issueBannerText}>
+            {issueCount} uszkodzenie(a) oznaczone na zdjęciach
           </Text>
         </View>
       )}
@@ -472,41 +497,57 @@ export default function NewHandoverScreen() {
     </View>
   );
 
-  const renderSummary = () => (
-    <ScrollView contentContainerStyle={styles.scrollContent}>
-      <Text style={styles.sectionTitle}>{t('handover.company')}</Text>
-      <Text style={styles.summaryText}>{companyName}</Text>
-      {companyAddress ? <Text style={styles.summaryDetail}>{companyAddress}</Text> : null}
-      {companyContact ? <Text style={styles.summaryDetail}>{companyContact}</Text> : null}
+  const renderSummary = () => {
+    const photoEntries = Object.values(photos).filter(Boolean) as ZonePhoto[];
+    const issuePhotos = photoEntries.filter((p) => p.hasIssue);
 
-      <Text style={styles.sectionTitle}>{t('handover.trailer')}</Text>
-      <Text style={styles.summaryText}>{registrationNumber} - {t(`trailer.types.${trailerType}`)}</Text>
-      {vin ? <Text style={styles.summaryDetail}>VIN: {vin}</Text> : null}
-      {brand ? <Text style={styles.summaryDetail}>{brand}</Text> : null}
+    return (
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <Text style={styles.sectionTitle}>{t('handover.company')}</Text>
+        <Text style={styles.summaryText}>{companyName}</Text>
+        {companyAddress ? <Text style={styles.summaryDetail}>{companyAddress}</Text> : null}
+        {companyContact ? <Text style={styles.summaryDetail}>{companyContact}</Text> : null}
 
-      <Text style={styles.sectionTitle}>{t('handover.date')}</Text>
-      <Text style={styles.summaryText}>{handoverDate} {handoverTime}</Text>
+        <Text style={styles.sectionTitle}>{t('handover.trailer')}</Text>
+        <Text style={styles.summaryText}>{registrationNumber} - {t(`trailer.types.${trailerType}`)}</Text>
+        {vin ? <Text style={styles.summaryDetail}>VIN: {vin}</Text> : null}
+        {brand ? <Text style={styles.summaryDetail}>{brand}</Text> : null}
 
-      <Text style={styles.sectionTitle}>{t('handover.documents')}</Text>
-      <Text style={styles.summaryText}>{hasDocuments ? t('common.yes') : t('common.no')}</Text>
+        <Text style={styles.sectionTitle}>{t('handover.date')}</Text>
+        <Text style={styles.summaryText}>{handoverDate} {handoverTime}</Text>
 
-      <Text style={styles.sectionTitle}>{t('handover.beams')}</Text>
-      <Text style={styles.summaryText}>{beamsCount || '0'} {t('handover.pcs')}</Text>
+        <Text style={styles.sectionTitle}>{t('handover.documents')}</Text>
+        <Text style={styles.summaryText}>{hasDocuments ? t('common.yes') : t('common.no')}</Text>
 
-      <Text style={styles.sectionTitle}>{t('handover.straps')}</Text>
-      <Text style={styles.summaryText}>{strapsCount || '0'} {t('handover.pcs')}</Text>
+        <Text style={styles.sectionTitle}>{t('handover.beams')}</Text>
+        <Text style={styles.summaryText}>{beamsCount || '0'} {t('handover.pcs')}</Text>
 
-      {equipmentNotes ? (
-        <>
-          <Text style={styles.sectionTitle}>{t('handover.equipment')}</Text>
-          <Text style={styles.summaryText}>{equipmentNotes}</Text>
-        </>
-      ) : null}
+        <Text style={styles.sectionTitle}>{t('handover.straps')}</Text>
+        <Text style={styles.summaryText}>{strapsCount || '0'} {t('handover.pcs')}</Text>
 
-      <Text style={styles.sectionTitle}>{t('handover.photos')}</Text>
-      <Text style={styles.summaryDetail}>{Object.values(photos).filter(Boolean).length}</Text>
-    </ScrollView>
-  );
+        {equipmentNotes ? (
+          <>
+            <Text style={styles.sectionTitle}>{t('handover.equipment')}</Text>
+            <Text style={styles.summaryText}>{equipmentNotes}</Text>
+          </>
+        ) : null}
+
+        <Text style={styles.sectionTitle}>{t('handover.photos')}</Text>
+        <Text style={styles.summaryDetail}>{photoEntries.length} zdjęć</Text>
+
+        {issuePhotos.length > 0 && (
+          <>
+            <Text style={[styles.sectionTitle, { color: Colors.danger }]}>Uszkodzenia ({issuePhotos.length})</Text>
+            {issuePhotos.map((p, i) => (
+              <Text key={i} style={styles.issueItem}>
+                • {t(`photos.${p.position.replace('-', '')}`  as any) || p.position}: {p.issueDescription}
+              </Text>
+            ))}
+          </>
+        )}
+      </ScrollView>
+    );
+  };
 
   const steps = [renderCompanyStep, renderTrailerStep, renderPhotosStep, renderSummary];
   const stepLabels = [t('handover.company'), t('handover.trailer'), t('handover.photos'), 'Podsumowanie'];
@@ -581,6 +622,7 @@ export default function NewHandoverScreen() {
           onClose={() => setCapturePosition(null)}
           onSave={handlePhotoSave}
           existingPhoto={photos[capturePosition]}
+          showIssueFields
         />
       )}
     </View>
@@ -796,6 +838,7 @@ const styles = StyleSheet.create({
   navBtnSecondaryText: { color: Colors.textSecondary, fontSize: FontSize.md },
   summaryText: { fontSize: FontSize.md, color: Colors.text, fontWeight: '600' },
   summaryDetail: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 2 },
+  issueItem: { fontSize: FontSize.sm, color: Colors.danger, marginTop: 2, fontWeight: '500' },
   preloadedBanner: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -814,5 +857,23 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     color: '#92400e',
     lineHeight: 16,
+  },
+  issueBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginHorizontal: Spacing.md,
+    marginTop: Spacing.xs,
+    padding: Spacing.sm,
+    backgroundColor: '#fef2f2',
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: Colors.danger,
+  },
+  issueBannerText: {
+    flex: 1,
+    fontSize: FontSize.xs,
+    color: Colors.danger,
+    fontWeight: '600',
   },
 });

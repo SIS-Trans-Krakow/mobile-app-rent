@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
-import api, { setAccessToken } from '../services/api';
+import api, { setAccessToken, setOnUnauthenticated } from '../services/api';
 
 interface UserInfo {
   id: number;
@@ -84,3 +84,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 }));
+
+setOnUnauthenticated(() => {
+  useAuthStore.getState().logout();
+});

@@ -65,6 +65,8 @@ export default function ReturnScreen() {
           uri: getUploadsUrl(photo.file_path),
           position: photo.position_on_template,
           description: photo.description,
+          hasIssue: !!photo.has_issue,
+          issueDescription: photo.issue_description || '',
         };
       }
       setOriginalPhotos(oPhotos);
@@ -182,6 +184,7 @@ export default function ReturnScreen() {
   }
 
   const hasIssues = Object.values(returnPhotos).some((p) => p?.hasIssue);
+  const handoverIssueCount = Object.values(originalPhotos).filter((p) => p?.hasIssue).length;
   const requiredPositions = ALL_POSITIONS.filter((pos) => !!originalPhotos[pos]);
   const missingRequiredPositions = requiredPositions.filter((pos) => !returnPhotos[pos]);
 
@@ -262,6 +265,14 @@ export default function ReturnScreen() {
       </View>
 
       {/* Comparison: original photos + new photos */}
+      {handoverIssueCount > 0 && (
+        <View style={styles.handoverIssueBanner}>
+          <Ionicons name="warning" size={16} color={Colors.danger} />
+          <Text style={styles.handoverIssueBannerText}>
+            {handoverIssueCount} uszkodzenie(a) zgłoszone przy przekazaniu — widoczne na zdjęciach poniżej
+          </Text>
+        </View>
+      )}
       <Text style={styles.sectionTitle}>{t('return.comparison')}</Text>
       {requiredPositions.length > 0 && (
         <Text style={styles.requiredHint}>
@@ -289,20 +300,32 @@ export default function ReturnScreen() {
                 <Text style={styles.colLabel}>{t('return.original')}</Text>
                 {original ? (
                   <TouchableOpacity
-                    onPress={() => setLightboxPhoto({ uri: original.uri, label: t(POSITION_LABELS[pos]), description: original.description })}
+                    onPress={() => setLightboxPhoto({
+                      uri: original.uri,
+                      label: t(POSITION_LABELS[pos]),
+                      description: original.hasIssue ? original.issueDescription : original.description,
+                    })}
                     activeOpacity={0.85}
+                    style={original.hasIssue ? styles.issueContainer : undefined}
                   >
                     <Image source={{ uri: original.uri }} style={styles.comparisonImg} />
                     <View style={styles.expandBadge}>
                       <Ionicons name="expand-outline" size={12} color={Colors.white} />
                     </View>
+                    {original.hasIssue && (
+                      <View style={styles.origIssueBadge}>
+                        <Text style={styles.origIssueBadgeText}>!</Text>
+                      </View>
+                    )}
                   </TouchableOpacity>
                 ) : (
                   <View style={styles.noPhoto}>
                     <Text style={styles.noPhotoText}>-</Text>
                   </View>
                 )}
-                {original?.description ? (
+                {original?.hasIssue && original.issueDescription ? (
+                  <Text style={styles.issueText}>{original.issueDescription}</Text>
+                ) : original?.description ? (
                   <Text style={styles.compDesc}>{original.description}</Text>
                 ) : null}
               </View>
@@ -586,5 +609,40 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     color: '#9a3412',
     marginTop: 2,
+  },
+  origIssueBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: Colors.danger,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  origIssueBadgeText: {
+    color: Colors.white,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  handoverIssueBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    padding: Spacing.sm,
+    backgroundColor: '#fef2f2',
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: Colors.danger,
+    marginBottom: Spacing.sm,
+    marginTop: Spacing.sm,
+  },
+  handoverIssueBannerText: {
+    flex: 1,
+    fontSize: FontSize.xs,
+    color: Colors.danger,
+    fontWeight: '600',
+    lineHeight: 16,
   },
 });

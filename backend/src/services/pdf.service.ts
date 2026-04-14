@@ -46,6 +46,8 @@ interface HandoverData {
     file_path: string;
     position_on_template: string;
     description: string;
+    has_issue: number;
+    issue_description: string;
   }>;
 }
 
@@ -196,6 +198,18 @@ export function generateHandoverPdf(data: HandoverData): PDFKit.PDFDocument {
     doc.moveDown(0.8);
   }
 
+  const issuePhotos = data.photos.filter(p => p.has_issue);
+  if (issuePhotos.length > 0) {
+    doc.fontSize(12).fillColor('red').text('STWIERDZONE USZKODZENIA', { underline: true });
+    doc.fillColor('black').moveDown(0.3);
+    doc.fontSize(10);
+    for (const photo of issuePhotos) {
+      const label = POSITION_LABELS[photo.position_on_template] || photo.position_on_template;
+      doc.text(`• ${label}: ${photo.issue_description}`);
+    }
+    doc.moveDown(0.8);
+  }
+
   if (data.photos.length > 0) {
     doc.addPage();
     doc.fontSize(12).text('Dokumentacja fotograficzna', { underline: true });
@@ -210,6 +224,11 @@ export function generateHandoverPdf(data: HandoverData): PDFKit.PDFDocument {
       doc.fontSize(10).text(`Pozycja: ${label}`, { continued: false });
       if (photo.description) {
         doc.text(`Opis: ${photo.description}`);
+      }
+      if (photo.has_issue) {
+        doc.fontSize(9).fillColor('red')
+          .text(`USZKODZENIE: ${photo.issue_description}`);
+        doc.fillColor('black');
       }
 
       drawImageOrPlaceholder(doc, filePath, { width: 250, height: 180 });
@@ -259,18 +278,60 @@ export function generateReturnPdf(handoverData: HandoverData, returnData: Return
     doc.moveDown(0.8);
   }
 
-  const issuePhotos = returnData.photos.filter(p => p.has_issue);
-  if (issuePhotos.length > 0) {
-    doc.fontSize(12).fillColor('red').text('STWIERDZONE NIEPRAWIDŁOWOŚCI', { underline: true });
+  const handoverIssuesByPos = new Map<string, string>();
+  for (const p of handoverData.photos) {
+    if (p.has_issue) {
+      handoverIssuesByPos.set(p.position_on_template, p.issue_description);
+    }
+  }
+
+  const returnIssuePhotos = returnData.photos.filter(p => p.has_issue);
+  const newIssues = returnIssuePhotos.filter(p => !handoverIssuesByPos.has(p.position_on_template));
+  const continuedIssues = returnIssuePhotos.filter(p => handoverIssuesByPos.has(p.position_on_template));
+  const resolvedIssues = handoverData.photos.filter(
+    p => p.has_issue && !returnData.photos.find(r => r.position_on_template === p.position_on_template && r.has_issue)
+  );
+
+  if (newIssues.length > 0) {
+    doc.fontSize(12).fillColor('red').text('NOWE NIEPRAWIDŁOWOŚCI', { underline: true });
     doc.fillColor('black').moveDown(0.3);
     doc.fontSize(10);
-    for (const photo of issuePhotos) {
+    for (const photo of newIssues) {
       const label = POSITION_LABELS[photo.position_on_template] || photo.position_on_template;
       doc.text(`• ${label}: ${photo.issue_description}`);
     }
     doc.moveDown(0.8);
-  } else {
+  }
+
+  if (continuedIssues.length > 0) {
+    doc.fontSize(12).fillColor('#b45309').text('ISTNIEJĄCE USZKODZENIA (z przekazania)', { underline: true });
+    doc.fillColor('black').moveDown(0.3);
+    doc.fontSize(10);
+    for (const photo of continuedIssues) {
+      const label = POSITION_LABELS[photo.position_on_template] || photo.position_on_template;
+      const origDesc = handoverIssuesByPos.get(photo.position_on_template) || '';
+      const changed = origDesc !== photo.issue_description;
+      doc.text(`• ${label}: ${photo.issue_description}${changed ? ` (przy przekazaniu: ${origDesc})` : ''}`);
+    }
+    doc.moveDown(0.8);
+  }
+
+  if (resolvedIssues.length > 0) {
+    doc.fontSize(12).fillColor('green').text('NAPRAWIONE USZKODZENIA', { underline: true });
+    doc.fillColor('black').moveDown(0.3);
+    doc.fontSize(10);
+    for (const photo of resolvedIssues) {
+      const label = POSITION_LABELS[photo.position_on_template] || photo.position_on_template;
+      doc.text(`• ${label}: ${photo.issue_description}`);
+    }
+    doc.moveDown(0.8);
+  }
+
+  if (newIssues.length === 0 && continuedIssues.length === 0 && resolvedIssues.length === 0) {
     doc.fontSize(12).text('Brak stwierdzonych nieprawidłowości.', { align: 'center' });
+    doc.moveDown(0.8);
+  } else if (newIssues.length === 0) {
+    doc.fontSize(10).text('Brak nowych nieprawidłowości stwierdzonych przy zwrocie.', { align: 'center' });
     doc.moveDown(0.8);
   }
 
@@ -303,7 +364,11 @@ export function generateReturnPdf(handoverData: HandoverData, returnData: Return
     if (handoverPhoto) {
       const fp = path.join(UPLOADS_DIR, handoverPhoto.file_path);
       drawImageOrPlaceholder(doc, fp, { x: leftX, y: startY + 12, width: imgW, height: imgH });
-      if (handoverPhoto.description) {
+      if (handoverPhoto.has_issue) {
+        doc.fontSize(8).fillColor('#b45309')
+          .text(`USZKODZENIE: ${handoverPhoto.issue_description}`, leftX, startY + imgH + 14, { width: imgW });
+        doc.fillColor('black');
+      } else if (handoverPhoto.description) {
         doc.fontSize(7).text(handoverPhoto.description, leftX, startY + imgH + 14, { width: imgW });
       }
     } else {
@@ -315,8 +380,10 @@ export function generateReturnPdf(handoverData: HandoverData, returnData: Return
       const fp = path.join(UPLOADS_DIR, returnPhoto.file_path);
       drawImageOrPlaceholder(doc, fp, { x: rightX, y: startY + 12, width: imgW, height: imgH });
       if (returnPhoto.has_issue) {
+        const isNew = !handoverIssuesByPos.has(returnPhoto.position_on_template);
+        const issueLabel = isNew ? 'NOWE USZKODZENIE' : 'USZKODZENIE';
         doc.fontSize(8).fillColor('red')
-          .text(`NIEPRAWIDŁOWOŚĆ: ${returnPhoto.issue_description}`, rightX, startY + imgH + 14, { width: imgW });
+          .text(`${issueLabel}: ${returnPhoto.issue_description}`, rightX, startY + imgH + 14, { width: imgW });
         doc.fillColor('black');
       } else if (returnPhoto.description) {
         doc.fontSize(7).text(returnPhoto.description, rightX, startY + imgH + 14, { width: imgW });

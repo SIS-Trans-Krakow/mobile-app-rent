@@ -36,10 +36,13 @@ export default function PhotoCapture({
   position, visible, onClose, onSave, existingPhoto, showIssueFields, originalPhoto,
 }: Props) {
   const { t } = useTranslation();
+  const fallbackIssue = !existingPhoto && originalPhoto?.hasIssue;
   const [uri, setUri] = useState(existingPhoto?.uri || '');
   const [description, setDescription] = useState(existingPhoto?.description || '');
-  const [hasIssue, setHasIssue] = useState(existingPhoto?.hasIssue || false);
-  const [issueDescription, setIssueDescription] = useState(existingPhoto?.issueDescription || '');
+  const [hasIssue, setHasIssue] = useState(existingPhoto?.hasIssue || fallbackIssue || false);
+  const [issueDescription, setIssueDescription] = useState(
+    existingPhoto?.issueDescription || (fallbackIssue ? originalPhoto?.issueDescription : '') || ''
+  );
 
   const takePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -95,10 +98,12 @@ export default function PhotoCapture({
         </View>
 
         {originalPhoto && (
-          <View style={styles.originalSection}>
+          <View style={[styles.originalSection, originalPhoto.hasIssue && styles.originalSectionIssue]}>
             <Text style={styles.sectionLabel}>{t('return.original')}:</Text>
             <Image source={{ uri: originalPhoto.uri }} style={styles.originalImage} />
-            {originalPhoto.description ? (
+            {originalPhoto.hasIssue && originalPhoto.issueDescription ? (
+              <Text style={styles.originalIssueDesc}>Uszkodzenie: {originalPhoto.issueDescription}</Text>
+            ) : originalPhoto.description ? (
               <Text style={styles.originalDesc}>{originalPhoto.description}</Text>
             ) : null}
           </View>
@@ -187,6 +192,10 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginBottom: Spacing.xs,
   },
+  originalSectionIssue: {
+    backgroundColor: '#fef2f2',
+    borderBottomColor: Colors.danger,
+  },
   originalImage: {
     width: '100%',
     height: 120,
@@ -196,6 +205,12 @@ const styles = StyleSheet.create({
   originalDesc: {
     fontSize: FontSize.xs,
     color: Colors.textSecondary,
+    marginTop: Spacing.xs,
+  },
+  originalIssueDesc: {
+    fontSize: FontSize.xs,
+    color: Colors.danger,
+    fontWeight: '600',
     marginTop: Spacing.xs,
   },
   photoSection: { alignItems: 'center', padding: Spacing.md },

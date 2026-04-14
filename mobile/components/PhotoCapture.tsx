@@ -90,12 +90,16 @@ export default function PhotoCapture({
       Alert.alert(t('common.error'), t('photos.takePhoto'));
       return;
     }
+    if (showIssueFields && hasIssue && !issueDescription.trim()) {
+      Alert.alert(t('common.error'), t('return.issueDescriptionRequired'));
+      return;
+    }
     onSave({
       uri,
       position,
-      description,
+      description: description.trim(),
       hasIssue: showIssueFields ? hasIssue : undefined,
-      issueDescription: showIssueFields && hasIssue ? issueDescription : undefined,
+      issueDescription: showIssueFields && hasIssue ? issueDescription.trim() : undefined,
     });
     onClose();
   };

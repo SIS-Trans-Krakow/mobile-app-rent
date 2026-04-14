@@ -83,6 +83,8 @@
     "preloadedBanner": "Zdjęcia z ostatniego zwrotu ({{date}}) zostały wstępnie dodane wraz z uszkodzeniami. Naciśnij strefę, aby podmienić lub edytować.",
     "issueCountBanner": "{{count}} uszkodzenie(a) oznaczone na zdjęciach",
     "issuesCount": "Uszkodzenia ({{count}})",
+    "missingRequiredPhotos": "Brakuje wymaganych zdjęć: {{positions}}",
+    "issueDescriptionRequiredForPosition": "Dodaj opis nieprawidłowości dla pozycji: {{position}}",
     "photosCount": "{{count}} zdjęć",
     "savedPhotosCount": "Zapisane zdjęcia: {{count}}",
     "noPhotosInHandover": "Brak zdjęć w tym przekazaniu.",
@@ -122,6 +124,8 @@
     "description": "Opis zdjęcia",
     "tapZone": "Dotknij strefę na szablonie aby dodać zdjęcie",
     "inheritedFromLastReturn": "↩ z ostatniego zwrotu",
+    "inheritedIssue": "Uszkodzenie odziedziczone",
+    "newIssue": "Nowe uszkodzenie",
     "cameraPermissionRequired": "Wymagane uprawnienie do aparatu"
   },
   "return": {
@@ -138,7 +142,9 @@
     "returnStraps": "Pasy przy zwrocie (szt.)",
     "issueFound": "Stwierdzono nieprawidłowość",
     "issueDescription": "Opis nieprawidłowości",
+    "issueDescriptionRequired": "Opis nieprawidłowości jest wymagany",
     "noIssues": "Brak nieprawidłowości",
+    "submitReturn": "Zarejestruj zwrot",
     "generateReport": "Generuj raport",
     "comparison": "Porównanie",
     "original": "Przekazanie",

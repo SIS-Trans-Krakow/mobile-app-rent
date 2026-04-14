@@ -12,6 +12,7 @@ router.use(authenticate);
 
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png']);
 const ALLOWED_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png']);
+const REQUIRED_HANDOVER_POSITIONS = ['front', 'rear', 'left-side', 'right-side'];
 
 const storage = multer.diskStorage({
   destination: path.join(__dirname, '..', '..', 'uploads'),
@@ -217,6 +218,47 @@ router.post('/', upload.array('photos', 20), async (req: Request, res: Response)
     const inhDescriptions = toArray(inherited_photo_descriptions);
     const inhHasIssues = toArray(inherited_photo_has_issues);
     const inhIssueDescs = toArray(inherited_photo_issue_descriptions);
+
+    const submittedPositions = new Set<string>();
+    for (let i = 0; i < files.length; i++) {
+      submittedPositions.add((positions[i] || 'front').toString().trim());
+    }
+    for (let i = 0; i < inhFilenames.length; i++) {
+      submittedPositions.add((inhPositions[i] || 'front').toString().trim());
+    }
+
+    const missingRequiredPositions = REQUIRED_HANDOVER_POSITIONS.filter(
+      (position) => !submittedPositions.has(position)
+    );
+    if (missingRequiredPositions.length > 0) {
+      res.status(400).json({
+        error: 'Missing required handover photos',
+        missing_positions: missingRequiredPositions,
+      });
+      return;
+    }
+
+    for (let i = 0; i < files.length; i++) {
+      const hasIssue = hasIssues[i] === '1' || hasIssues[i] === 'true';
+      if (hasIssue && !String(issueDescs[i] || '').trim()) {
+        res.status(400).json({
+          error: 'Issue description is required when issue is marked',
+          position: positions[i] || 'front',
+        });
+        return;
+      }
+    }
+
+    for (let i = 0; i < inhFilenames.length; i++) {
+      const hasIssue = inhHasIssues[i] === '1' || inhHasIssues[i] === 'true';
+      if (hasIssue && !String(inhIssueDescs[i] || '').trim()) {
+        res.status(400).json({
+          error: 'Issue description is required when issue is marked',
+          position: inhPositions[i] || 'front',
+        });
+        return;
+      }
+    }
 
     for (let i = 0; i < inhFilenames.length; i++) {
       const originalFilename = inhFilenames[i];

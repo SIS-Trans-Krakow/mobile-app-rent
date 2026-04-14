@@ -191,9 +191,7 @@ export default function ReturnScreen() {
   const submitAccessibilityLabel =
     missingRequiredPositions.length > 0
       ? t('return.fillMissingPhotos')
-      : hasIssues
-        ? t('return.generateReport')
-        : t('common.submit');
+      : t('return.submitReturn');
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -340,6 +338,8 @@ export default function ReturnScreen() {
                   <Text style={styles.issueText}>{original.issueDescription}</Text>
                 ) : original?.description ? (
                   <Text style={styles.compDesc}>{original.description}</Text>
+                ) : original ? (
+                  <Text style={styles.noIssueText}>{t('return.noIssues')}</Text>
                 ) : null}
               </View>
 
@@ -405,6 +405,8 @@ export default function ReturnScreen() {
                   <Text style={styles.issueText}>{returnPhoto.issueDescription}</Text>
                 ) : returnPhoto?.description ? (
                   <Text style={styles.compDesc}>{returnPhoto.description}</Text>
+                ) : returnPhoto ? (
+                  <Text style={styles.noIssueText}>{t('return.noIssues')}</Text>
                 ) : null}
               </View>
             </View>
@@ -443,9 +445,7 @@ export default function ReturnScreen() {
             <Text style={styles.submitText}>
               {missingRequiredPositions.length > 0
                 ? t('return.fillMissingPhotos')
-                : hasIssues
-                  ? t('return.generateReport')
-                  : t('common.submit')}
+                : t('return.submitReturn')}
             </Text>
           </>
         )}
@@ -587,6 +587,12 @@ const styles = StyleSheet.create({
   },
   addPhotoText: { fontSize: FontSize.xs, color: Colors.primary, marginTop: 4 },
   compDesc: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: Spacing.xs },
+  noIssueText: {
+    fontSize: FontSize.xs,
+    color: Colors.success,
+    fontWeight: '600',
+    marginTop: Spacing.xs,
+  },
   issueText: {
     fontSize: FontSize.xs,
     color: Colors.danger,

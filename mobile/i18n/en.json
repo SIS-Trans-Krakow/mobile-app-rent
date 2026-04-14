@@ -83,6 +83,8 @@
     "preloadedBanner": "Photos from the last return ({{date}}) were preloaded together with issues. Tap a zone to replace or edit.",
     "issueCountBanner": "{{count}} issue(s) marked on photos",
     "issuesCount": "Issues ({{count}})",
+    "missingRequiredPhotos": "Missing required photos: {{positions}}",
+    "issueDescriptionRequiredForPosition": "Add issue description for position: {{position}}",
     "photosCount": "{{count}} photos",
     "savedPhotosCount": "Saved photos: {{count}}",
     "noPhotosInHandover": "No photos in this handover.",
@@ -122,6 +124,8 @@
     "description": "Photo description",
     "tapZone": "Tap a zone on the template to add a photo",
     "inheritedFromLastReturn": "↩ from last return",
+    "inheritedIssue": "Inherited issue",
+    "newIssue": "New issue",
     "cameraPermissionRequired": "Camera permission required"
   },
   "return": {
@@ -138,7 +142,9 @@
     "returnStraps": "Straps on return (pcs)",
     "issueFound": "Issue found",
     "issueDescription": "Issue description",
+    "issueDescriptionRequired": "Issue description is required",
     "noIssues": "No issues found",
+    "submitReturn": "Register Return",
     "generateReport": "Generate Report",
     "comparison": "Comparison",
     "original": "Handover",

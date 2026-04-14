@@ -174,6 +174,13 @@ export default function TrailerTemplate({ photos, onZonePress, readOnly, onPhoto
             {photo!.isPreloaded && (
               <Text style={styles.preloadedLabel}>{t('photos.inheritedFromLastReturn')}</Text>
             )}
+            {photo!.hasIssue ? (
+              <Text style={styles.issueStatusText}>
+                {photo!.isPreloaded ? t('photos.inheritedIssue') : t('photos.newIssue')}
+              </Text>
+            ) : (
+              <Text style={styles.noIssueLabel}>{t('return.noIssues')}</Text>
+            )}
             {photo!.description ? <Text style={styles.photoDescText}>{photo!.description}</Text> : null}
             {photo!.hasIssue && (
               <Text style={styles.issueText}>{photo!.issueDescription}</Text>
@@ -334,6 +341,18 @@ const styles = StyleSheet.create({
   issueText: {
     fontSize: FontSize.xs,
     color: Colors.danger,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  issueStatusText: {
+    fontSize: FontSize.xs,
+    color: Colors.danger,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  noIssueLabel: {
+    fontSize: FontSize.xs,
+    color: Colors.success,
     fontWeight: '600',
     marginTop: 2,
   },

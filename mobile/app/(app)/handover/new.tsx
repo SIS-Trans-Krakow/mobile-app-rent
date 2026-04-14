@@ -34,6 +34,7 @@ const POSITION_LABELS: Record<PhotoPosition, string> = {
   'rear-left': 'photos.rearLeft',
   'rear-right': 'photos.rearRight',
 };
+const MIN_REQUIRED_POSITIONS: PhotoPosition[] = ['front', 'rear', 'left-side', 'right-side'];
 
 export default function NewHandoverScreen() {
   const { t } = useTranslation();
@@ -106,6 +107,35 @@ export default function NewHandoverScreen() {
       clearTrailerSelection();
     }
     searchTrailers(text);
+  };
+
+  const handleManualEntryFromSearch = async () => {
+    const normalized = searchQuery.trim().toUpperCase();
+    if (!normalized) return;
+
+    setRegistrationNumber(normalized);
+    setShowResults(false);
+    setSearchResults([]);
+
+    const localExact = searchResults.find(
+      (trailer) => trailer.registration_number.trim().toUpperCase() === normalized
+    );
+    if (localExact) {
+      await selectTrailer(localExact);
+      return;
+    }
+
+    try {
+      const res = await api.get('/trailers', { params: { search: normalized } });
+      const exact = (res.data || []).find(
+        (trailer: TrailerResult) => trailer.registration_number.trim().toUpperCase() === normalized
+      );
+      if (exact) {
+        await selectTrailer(exact);
+      }
+    } catch {
+      // Keep manual entry when lookup fails.
+    }
   };
 
   const selectTrailer = async (trailer: TrailerResult) => {
@@ -201,6 +231,24 @@ export default function NewHandoverScreen() {
 
   const handleSubmit = async () => {
     if (loading) return;
+    const photoEntries = Object.values(photos).filter(Boolean) as ZonePhoto[];
+    const addedPositions = new Set(photoEntries.map((photo) => photo.position));
+    const missingRequiredPositions = MIN_REQUIRED_POSITIONS.filter((position) => !addedPositions.has(position));
+    if (missingRequiredPositions.length > 0) {
+      const missingLabels = missingRequiredPositions.map((position) => t(POSITION_LABELS[position])).join(', ');
+      Alert.alert(t('common.error'), t('handover.missingRequiredPhotos', { positions: missingLabels }));
+      return;
+    }
+
+    const invalidIssuePhoto = photoEntries.find((photo) => photo.hasIssue && !photo.issueDescription?.trim());
+    if (invalidIssuePhoto) {
+      Alert.alert(
+        t('common.error'),
+        t('handover.issueDescriptionRequiredForPosition', { position: t(POSITION_LABELS[invalidIssuePhoto.position]) })
+      );
+      return;
+    }
+
     setLoading(true);
     try {
       const formData = new FormData();
@@ -223,7 +271,6 @@ export default function NewHandoverScreen() {
       formData.append('beams_count', beamsCount || '0');
       formData.append('straps_count', strapsCount || '0');
 
-      const photoEntries = Object.values(photos).filter(Boolean) as ZonePhoto[];
       for (const photo of photoEntries) {
         if (photo.isPreloaded && photo.preloadedFilePath) {
           formData.append('inherited_photo_filenames', photo.preloadedFilePath);
@@ -365,11 +412,7 @@ export default function NewHandoverScreen() {
                   ))}
                   <TouchableOpacity
                     style={styles.resultItemManual}
-                    onPress={() => {
-                      setRegistrationNumber(searchQuery.trim().toUpperCase());
-                      setShowResults(false);
-                      setSearchResults([]);
-                    }}
+                    onPress={() => { void handleManualEntryFromSearch(); }}
                     accessibilityRole="button"
                     accessible
                     accessibilityLabel={t('handover.manualEntry')}
@@ -385,11 +428,7 @@ export default function NewHandoverScreen() {
                   </View>
                   <TouchableOpacity
                     style={styles.resultItemManual}
-                    onPress={() => {
-                      setRegistrationNumber(searchQuery.trim().toUpperCase());
-                      setShowResults(false);
-                      setSearchResults([]);
-                    }}
+                    onPress={() => { void handleManualEntryFromSearch(); }}
                     accessibilityRole="button"
                     accessible
                     accessibilityLabel={t('handover.manualEntry')}
@@ -606,12 +645,6 @@ export default function NewHandoverScreen() {
 
       {/* Step content */}
       <View style={styles.content}>
-        <View style={styles.stepHeader}>
-          <Text style={styles.stepHeaderTitle}>{stepLabels[step]}</Text>
-          <Text style={styles.stepHeaderSubtitle}>
-            {t('handover.stepOf', { current: step + 1, total: steps.length })}
-          </Text>
-        </View>
         {steps[step]()}
       </View>
 
@@ -704,26 +737,6 @@ const styles = StyleSheet.create({
   progressLabel: { fontSize: 10, color: Colors.gray400, marginTop: 2 },
   progressLabelActive: { color: Colors.primary, fontWeight: '600' },
   content: { flex: 1 },
-  stepHeader: {
-    marginHorizontal: Spacing.md,
-    marginTop: Spacing.md,
-    marginBottom: Spacing.xs,
-    padding: Spacing.md,
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  stepHeaderTitle: {
-    fontSize: FontSize.md,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  stepHeaderSubtitle: {
-    marginTop: 2,
-    fontSize: FontSize.xs,
-    color: Colors.textSecondary,
-  },
   sectionTitle: {
     fontSize: FontSize.lg,
     fontWeight: '700',

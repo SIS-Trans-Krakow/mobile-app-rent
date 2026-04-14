@@ -129,6 +129,17 @@ router.post('/', upload.array('photos', 20), async (req: Request, res: Response)
       }
     }
 
+    for (let i = 0; i < files.length; i++) {
+      const hasIssue = hasIssues[i] === '1' || hasIssues[i] === 'true';
+      if (hasIssue && !String(issueDescs[i] || '').trim()) {
+        res.status(400).json({
+          error: 'Issue description is required when issue is marked',
+          position: positions[i] || 'front',
+        });
+        return;
+      }
+    }
+
     const returnResult = db.prepare(`
       INSERT INTO returns (handover_id, created_by, return_date, return_time, notes, return_has_documents, return_beams_count, return_straps_count)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)

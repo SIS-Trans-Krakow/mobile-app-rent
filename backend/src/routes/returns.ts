@@ -4,6 +4,7 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { getDb } from '../database/schema';
 import { authenticate } from '../middleware/auth';
+import { convertToPdfCompatibleJpeg } from '../utils/image';
 
 const router = Router();
 router.use(authenticate);
@@ -71,11 +72,12 @@ router.get('/by-handover/:handoverId', (req: Request, res: Response) => {
   res.json({ ...returnRecord, photos });
 });
 
-router.post('/', upload.array('photos', 20), (req: Request, res: Response) => {
+router.post('/', upload.array('photos', 20), async (req: Request, res: Response) => {
   try {
     const db = getDb();
     const {
       handover_id, return_date, return_time, notes,
+      return_has_documents, return_beams_count, return_straps_count,
       photo_positions, photo_descriptions, photo_has_issues, photo_issue_descriptions,
     } = req.body;
 
@@ -127,12 +129,20 @@ router.post('/', upload.array('photos', 20), (req: Request, res: Response) => {
     }
 
     const returnResult = db.prepare(`
-      INSERT INTO returns (handover_id, created_by, return_date, return_time, notes)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(Number(handover_id), req.user!.userId, return_date, return_time, notes || '');
+      INSERT INTO returns (handover_id, created_by, return_date, return_time, notes, return_has_documents, return_beams_count, return_straps_count)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      Number(handover_id), req.user!.userId, return_date, return_time, notes || '',
+      return_has_documents === '1' || return_has_documents === 'true' ? 1 : 0,
+      Number(return_beams_count) || 0,
+      Number(return_straps_count) || 0,
+    );
     const returnId = Number(returnResult.lastInsertRowid);
 
     db.prepare('UPDATE handovers SET status = ? WHERE id = ?').run('returned', Number(handover_id));
+
+    const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads');
+    await Promise.all(files.map(f => convertToPdfCompatibleJpeg(path.join(UPLOADS_DIR, f.filename))));
 
     const insertPhoto = db.prepare(
       'INSERT INTO return_photos (return_id, file_path, position_on_template, description, has_issue, issue_description) VALUES (?, ?, ?, ?, ?, ?)'

@@ -148,3 +148,80 @@ mobile-app-rent/
 | Username | Password   | Role  |
 |----------|------------|-------|
 | admin    | admin123   | Admin |
+
+---
+
+## Backend Deployment (Production)
+
+The backend ships with a `deploy.sh` script for deploying to a remote Ubuntu server via SSH. All commands are run from your machine, not the server.
+
+### Prerequisites
+
+- SSH access to the server (key-based auth recommended)
+- `rsync` and `scp` available locally
+
+### 1. Configure deploy variables
+
+Add the following to `backend/.env` (copy from `.env.example`):
+
+```
+DEPLOY_USER=ubuntu
+DEPLOY_HOST=1.2.3.4
+DEPLOY_PATH=/home/ubuntu/trailer-handover-api
+```
+
+### 2. First deploy
+
+```bash
+cd backend
+./deploy.sh --init
+```
+
+This will (only installs what's missing — safe on shared servers):
+1. Install system packages (`build-essential`, `sqlite3`, etc.)
+2. Install Node.js 20 if not present or version is older
+3. Install PM2 globally if not present; configure `pm2-logrotate` if not already set up
+4. Sync code via `rsync`
+5. Push local `.env` to server
+6. Run `npm install` + `tsc` build
+7. Start app with PM2 and enable systemd autostart
+
+### 3. Deploy code updates
+
+```bash
+cd backend
+./deploy.sh
+```
+
+Syncs code → `npm install` → build → PM2 restart.
+
+### All commands
+
+| Command | Description |
+|---|---|
+| `./deploy.sh` | Push code update (sync → build → restart) |
+| `./deploy.sh --init` | First-time full setup |
+| `./deploy.sh --host 10.0.0.5` | Override target IP for any command |
+| `./deploy.sh --env` | Push local `.env` to server |
+| `./deploy.sh --db-pull` | Download `data/app.db` from server → local |
+| `./deploy.sh --db-push` | Upload local DB to server (stops app during transfer) |
+| `./deploy.sh --db-migrate OLD NEW` | Transfer DB directly between two servers |
+| `./deploy.sh --redirect NEW_IP` | Stop app, set up HTTP 301 redirect to new server |
+| `./deploy.sh --redirect-stop` | Remove redirect, restart normal app |
+| `./deploy.sh --logs` | Tail PM2 logs live |
+| `./deploy.sh --status` | Show PM2 process status |
+
+### Production mobile app URL
+
+After deploying the backend, update `mobile/.env.production` with the server's IP or domain:
+
+```
+EXPO_PUBLIC_API_URL=http://1.2.3.4:3001
+```
+
+Then rebuild the mobile app with EAS:
+
+```bash
+cd mobile
+eas build --profile production --platform android
+```

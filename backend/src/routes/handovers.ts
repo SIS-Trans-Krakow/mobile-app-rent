@@ -5,6 +5,7 @@ import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { getDb } from '../database/schema';
 import { authenticate, requireAdmin } from '../middleware/auth';
+import { convertToPdfCompatibleJpeg } from '../utils/image';
 
 const router = Router();
 router.use(authenticate);
@@ -92,7 +93,7 @@ router.get('/:id', (req: Request, res: Response) => {
   });
 });
 
-router.post('/', upload.array('photos', 20), (req: Request, res: Response) => {
+router.post('/', upload.array('photos', 20), async (req: Request, res: Response) => {
   try {
     const db = getDb();
     const {
@@ -101,7 +102,9 @@ router.post('/', upload.array('photos', 20), (req: Request, res: Response) => {
       registration_number, vin, brand, trailer_type, production_date,
       trailer_id: existingTrailerId,
       handover_date, handover_time, equipment_notes,
+      has_documents, beams_count, straps_count,
       photo_positions, photo_descriptions,
+      inherited_photo_filenames, inherited_photo_positions, inherited_photo_descriptions,
     } = req.body;
 
     const normalizedCompanyName = (company_name || '').trim();
@@ -164,14 +167,23 @@ router.post('/', upload.array('photos', 20), (req: Request, res: Response) => {
     }
 
     const handoverResult = db.prepare(`
-      INSERT INTO handovers (company_id, trailer_id, created_by, handover_date, handover_time, equipment_notes)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(companyId, trailerId, req.user!.userId, handover_date, handover_time, equipment_notes || '');
+      INSERT INTO handovers (company_id, trailer_id, created_by, handover_date, handover_time, equipment_notes, has_documents, beams_count, straps_count)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      companyId, trailerId, req.user!.userId,
+      handover_date, handover_time, equipment_notes || '',
+      has_documents === '1' || has_documents === 'true' ? 1 : 0,
+      Number(beams_count) || 0,
+      Number(straps_count) || 0,
+    );
     const handoverId = Number(handoverResult.lastInsertRowid);
 
     const files = (req.files as Express.Multer.File[]) || [];
     const positions = Array.isArray(photo_positions) ? photo_positions : photo_positions ? [photo_positions] : [];
     const descriptions = Array.isArray(photo_descriptions) ? photo_descriptions : photo_descriptions ? [photo_descriptions] : [];
+
+    const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads');
+    await Promise.all(files.map(f => convertToPdfCompatibleJpeg(path.join(UPLOADS_DIR, f.filename))));
 
     const insertPhoto = db.prepare(
       'INSERT INTO handover_photos (handover_id, file_path, position_on_template, description) VALUES (?, ?, ?, ?)'
@@ -184,6 +196,33 @@ router.post('/', upload.array('photos', 20), (req: Request, res: Response) => {
         positions[i] || 'front',
         descriptions[i] || ''
       );
+    }
+
+    const inheritedFilenames = Array.isArray(inherited_photo_filenames)
+      ? inherited_photo_filenames
+      : inherited_photo_filenames ? [inherited_photo_filenames] : [];
+    const inheritedPositions = Array.isArray(inherited_photo_positions)
+      ? inherited_photo_positions
+      : inherited_photo_positions ? [inherited_photo_positions] : [];
+    const inheritedDescriptions = Array.isArray(inherited_photo_descriptions)
+      ? inherited_photo_descriptions
+      : inherited_photo_descriptions ? [inherited_photo_descriptions] : [];
+
+    for (let i = 0; i < inheritedFilenames.length; i++) {
+      const originalFilename = inheritedFilenames[i];
+      const originalPath = path.join(UPLOADS_DIR, originalFilename);
+      if (fs.existsSync(originalPath)) {
+        const ext = path.extname(originalFilename);
+        const newFilename = `${uuidv4()}${ext}`;
+        const newPath = path.join(UPLOADS_DIR, newFilename);
+        fs.copyFileSync(originalPath, newPath);
+        insertPhoto.run(
+          handoverId,
+          newFilename,
+          inheritedPositions[i] || 'front',
+          inheritedDescriptions[i] || ''
+        );
+      }
     }
 
     res.status(201).json({ id: handoverId, message: 'Handover created' });

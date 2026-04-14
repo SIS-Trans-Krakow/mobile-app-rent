@@ -207,6 +207,13 @@ export default function HandoverDetailScreen() {
         <Text style={styles.value}>{handover.handover_date} {handover.handover_time}</Text>
       </View>
 
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>{t('handover.documents')}</Text>
+        <Text style={styles.value}>{handover.has_documents ? t('common.yes') : t('common.no')}</Text>
+        <Text style={styles.detail}>{t('handover.beams')}: {handover.beams_count ?? 0} {t('handover.pcs')}</Text>
+        <Text style={styles.detail}>{t('handover.straps')}: {handover.straps_count ?? 0} {t('handover.pcs')}</Text>
+      </View>
+
       {handover.equipment_notes ? (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('handover.equipment')}</Text>

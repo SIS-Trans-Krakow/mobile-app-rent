@@ -31,6 +31,35 @@ router.get('/:id', (req: Request, res: Response) => {
   res.json(trailer);
 });
 
+router.get('/:id/last-return-photos', (req: Request, res: Response) => {
+  const db = getDb();
+  const trailerId = Number(req.params.id);
+  if (!Number.isFinite(trailerId)) {
+    res.status(400).json({ error: 'Invalid trailer id' });
+    return;
+  }
+
+  const lastReturn = db.prepare(`
+    SELECT r.id, r.return_date
+    FROM returns r
+    JOIN handovers h ON r.handover_id = h.id
+    WHERE h.trailer_id = ?
+    ORDER BY r.created_at DESC
+    LIMIT 1
+  `).get(trailerId) as { id: number; return_date: string } | undefined;
+
+  if (!lastReturn) {
+    res.json({ photos: [] });
+    return;
+  }
+
+  const photos = db.prepare(
+    'SELECT file_path, position_on_template, description FROM return_photos WHERE return_id = ? ORDER BY id'
+  ).all(lastReturn.id);
+
+  res.json({ photos, return_date: lastReturn.return_date });
+});
+
 router.post('/', requireAdmin, (req: Request, res: Response) => {
   const { registration_number, vin, brand, type, production_date } = req.body;
   if (!registration_number || !type) {

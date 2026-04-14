@@ -1,12 +1,12 @@
 import { useState, useRef, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView,
-  Alert, ActivityIndicator, Platform,
+  Alert, ActivityIndicator, Platform, Switch,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
-import api from '../../../services/api';
+import api, { getUploadsUrl } from '../../../services/api';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../../constants/theme';
 import TrailerTemplate, { PhotoPosition, ZonePhoto } from '../../../components/TrailerTemplate';
 import PhotoCapture from '../../../components/PhotoCapture';
@@ -55,11 +55,15 @@ export default function NewHandoverScreen() {
   const [handoverTime, setHandoverTime] = useState(
     new Date().toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })
   );
+  const [hasDocuments, setHasDocuments] = useState(false);
+  const [beamsCount, setBeamsCount] = useState('');
+  const [strapsCount, setStrapsCount] = useState('');
   const [equipmentNotes, setEquipmentNotes] = useState('');
 
   // Photos
   const [photos, setPhotos] = useState<Record<string, ZonePhoto | undefined>>({});
   const [capturePosition, setCapturePosition] = useState<PhotoPosition | null>(null);
+  const [lastReturnDate, setLastReturnDate] = useState<string | null>(null);
 
   const searchTrailers = useCallback((query: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -91,7 +95,7 @@ export default function NewHandoverScreen() {
     searchTrailers(text);
   };
 
-  const selectTrailer = (trailer: TrailerResult) => {
+  const selectTrailer = async (trailer: TrailerResult) => {
     setSelectedTrailer(trailer);
     setSearchQuery(trailer.registration_number);
     setRegistrationNumber(trailer.registration_number);
@@ -102,6 +106,32 @@ export default function NewHandoverScreen() {
     }
     setShowResults(false);
     setSearchResults([]);
+
+    try {
+      const res = await api.get(`/trailers/${trailer.id}/last-return-photos`);
+      const returnPhotos: Array<{ file_path: string; position_on_template: string; description: string }> =
+        res.data.photos || [];
+      if (returnPhotos.length > 0) {
+        const preloaded: Record<string, ZonePhoto> = {};
+        for (const p of returnPhotos) {
+          preloaded[p.position_on_template] = {
+            uri: getUploadsUrl(p.file_path),
+            position: p.position_on_template as PhotoPosition,
+            description: p.description || '',
+            isPreloaded: true,
+            preloadedFilePath: p.file_path,
+          };
+        }
+        setPhotos(preloaded);
+        setLastReturnDate(res.data.return_date || null);
+      } else {
+        setPhotos({});
+        setLastReturnDate(null);
+      }
+    } catch {
+      setPhotos({});
+      setLastReturnDate(null);
+    }
   };
 
   const clearTrailerSelection = () => {
@@ -113,6 +143,8 @@ export default function NewHandoverScreen() {
     setSearchQuery('');
     setShowResults(false);
     setSearchResults([]);
+    setPhotos({});
+    setLastReturnDate(null);
   };
 
   const handleZonePress = (position: PhotoPosition) => {
@@ -120,7 +152,7 @@ export default function NewHandoverScreen() {
   };
 
   const handlePhotoSave = (photo: ZonePhoto) => {
-    setPhotos((prev) => ({ ...prev, [photo.position]: photo }));
+    setPhotos((prev) => ({ ...prev, [photo.position]: { ...photo, isPreloaded: false, preloadedFilePath: undefined } }));
   };
 
   const validateStep = (): boolean => {
@@ -163,20 +195,29 @@ export default function NewHandoverScreen() {
       formData.append('handover_date', handoverDate);
       formData.append('handover_time', handoverTime);
       formData.append('equipment_notes', equipmentNotes);
+      formData.append('has_documents', hasDocuments ? '1' : '0');
+      formData.append('beams_count', beamsCount || '0');
+      formData.append('straps_count', strapsCount || '0');
 
       const photoEntries = Object.values(photos).filter(Boolean) as ZonePhoto[];
       for (const photo of photoEntries) {
-        const filename = photo.uri.split('/').pop() || 'photo.jpg';
-        if (Platform.OS === 'web') {
-          const response = await fetch(photo.uri);
-          const blob = await response.blob();
-          const file = new File([blob], filename, { type: blob.type || 'image/jpeg' });
-          formData.append('photos', file);
+        if (photo.isPreloaded && photo.preloadedFilePath) {
+          formData.append('inherited_photo_filenames', photo.preloadedFilePath);
+          formData.append('inherited_photo_positions', photo.position);
+          formData.append('inherited_photo_descriptions', photo.description || '');
         } else {
-          formData.append('photos', { uri: photo.uri, name: filename, type: 'image/jpeg' } as any);
+          const filename = photo.uri.split('/').pop() || 'photo.jpg';
+          if (Platform.OS === 'web') {
+            const response = await fetch(photo.uri);
+            const blob = await response.blob();
+            const file = new File([blob], filename, { type: blob.type || 'image/jpeg' });
+            formData.append('photos', file);
+          } else {
+            formData.append('photos', { uri: photo.uri, name: filename, type: 'image/jpeg' } as any);
+          }
+          formData.append('photo_positions', photo.position);
+          formData.append('photo_descriptions', photo.description || '');
         }
-        formData.append('photo_positions', photo.position);
-        formData.append('photo_descriptions', photo.description || '');
       }
 
       const res = await api.post('/handovers', formData, {
@@ -383,6 +424,29 @@ export default function NewHandoverScreen() {
         <TextInput style={styles.input} value={handoverTime} onChangeText={setHandoverTime}
           placeholder="HH:MM" placeholderTextColor={Colors.gray400} />
 
+        <Text style={styles.label}>{t('handover.documents')}</Text>
+        <View style={styles.switchRow}>
+          <Switch
+            value={hasDocuments}
+            onValueChange={setHasDocuments}
+            trackColor={{ false: Colors.gray200, true: Colors.primary }}
+            thumbColor={Colors.white}
+          />
+          <Text style={styles.switchLabel}>
+            {hasDocuments ? t('common.yes') : t('common.no')}
+          </Text>
+        </View>
+
+        <Text style={styles.label}>{t('handover.beams')}</Text>
+        <TextInput style={styles.input} value={beamsCount} onChangeText={setBeamsCount}
+          placeholder="0" placeholderTextColor={Colors.gray400}
+          keyboardType="number-pad" />
+
+        <Text style={styles.label}>{t('handover.straps')}</Text>
+        <TextInput style={styles.input} value={strapsCount} onChangeText={setStrapsCount}
+          placeholder="0" placeholderTextColor={Colors.gray400}
+          keyboardType="number-pad" />
+
         <Text style={styles.label}>{t('handover.equipment')}</Text>
         <TextInput style={[styles.input, styles.textArea]} value={equipmentNotes}
           onChangeText={setEquipmentNotes} placeholder={t('handover.equipmentNotes')}
@@ -392,10 +456,20 @@ export default function NewHandoverScreen() {
   };
 
   const renderPhotosStep = () => (
-    <TrailerTemplate
-      photos={photos}
-      onZonePress={handleZonePress}
-    />
+    <View style={{ flex: 1 }}>
+      {lastReturnDate && (
+        <View style={styles.preloadedBanner}>
+          <Ionicons name="images-outline" size={16} color={Colors.warning} />
+          <Text style={styles.preloadedBannerText}>
+            Zdjęcia startowe z ostatniego zwrotu ({lastReturnDate}) zostały wstępnie dodane. Naciśnij strefę, aby podmienić.
+          </Text>
+        </View>
+      )}
+      <TrailerTemplate
+        photos={photos}
+        onZonePress={handleZonePress}
+      />
+    </View>
   );
 
   const renderSummary = () => (
@@ -412,6 +486,15 @@ export default function NewHandoverScreen() {
 
       <Text style={styles.sectionTitle}>{t('handover.date')}</Text>
       <Text style={styles.summaryText}>{handoverDate} {handoverTime}</Text>
+
+      <Text style={styles.sectionTitle}>{t('handover.documents')}</Text>
+      <Text style={styles.summaryText}>{hasDocuments ? t('common.yes') : t('common.no')}</Text>
+
+      <Text style={styles.sectionTitle}>{t('handover.beams')}</Text>
+      <Text style={styles.summaryText}>{beamsCount || '0'} {t('handover.pcs')}</Text>
+
+      <Text style={styles.sectionTitle}>{t('handover.straps')}</Text>
+      <Text style={styles.summaryText}>{strapsCount || '0'} {t('handover.pcs')}</Text>
 
       {equipmentNotes ? (
         <>
@@ -576,6 +659,17 @@ const styles = StyleSheet.create({
   },
   textArea: { minHeight: 100, textAlignVertical: 'top' },
   inputDisabled: { backgroundColor: Colors.gray100, color: Colors.gray500 },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.xs,
+  },
+  switchLabel: {
+    fontSize: FontSize.md,
+    color: Colors.text,
+    fontWeight: '500',
+  },
   searchContainer: { position: 'relative', zIndex: 20 },
   searchInputRow: {
     flexDirection: 'row',
@@ -702,4 +796,23 @@ const styles = StyleSheet.create({
   navBtnSecondaryText: { color: Colors.textSecondary, fontSize: FontSize.md },
   summaryText: { fontSize: FontSize.md, color: Colors.text, fontWeight: '600' },
   summaryDetail: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 2 },
+  preloadedBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.xs,
+    marginHorizontal: Spacing.md,
+    marginTop: Spacing.sm,
+    marginBottom: 0,
+    padding: Spacing.sm,
+    backgroundColor: '#fffbeb',
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: Colors.warning,
+  },
+  preloadedBannerText: {
+    flex: 1,
+    fontSize: FontSize.xs,
+    color: '#92400e',
+    lineHeight: 16,
+  },
 });

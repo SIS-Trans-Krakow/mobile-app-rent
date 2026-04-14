@@ -27,6 +27,9 @@ interface HandoverData {
   handover_date: string;
   handover_time: string;
   equipment_notes: string;
+  has_documents: number;
+  beams_count: number;
+  straps_count: number;
   status: string;
   company_name: string;
   company_address: string;
@@ -51,6 +54,9 @@ interface ReturnData {
   return_date: string;
   return_time: string;
   notes: string;
+  return_has_documents: number;
+  return_beams_count: number;
+  return_straps_count: number;
   created_by_name: string;
   photos: Array<{
     file_path: string;
@@ -175,8 +181,16 @@ export function generateHandoverPdf(data: HandoverData): PDFKit.PDFDocument {
   }
   doc.moveDown(0.8);
 
+  doc.fontSize(12).text('Wyposażenie naczepy', { underline: true });
+  doc.moveDown(0.3);
+  doc.fontSize(10);
+  doc.text(`Dokumenty: ${data.has_documents ? 'TAK' : 'NIE'}`);
+  doc.text(`Belki: ${data.beams_count} szt.`);
+  doc.text(`Pasy: ${data.straps_count} szt.`);
+  doc.moveDown(0.8);
+
   if (data.equipment_notes) {
-    doc.fontSize(12).text('Wyposażenie', { underline: true });
+    doc.fontSize(12).text('Uwagi dodatkowe', { underline: true });
     doc.moveDown(0.3);
     doc.fontSize(10).text(data.equipment_notes);
     doc.moveDown(0.8);
@@ -228,6 +242,14 @@ export function generateReturnPdf(handoverData: HandoverData, returnData: Return
   doc.text(`Data przekazania: ${handoverData.handover_date}`);
   doc.text(`Firma: ${handoverData.company_name}`);
   doc.text(`Naczepa: ${handoverData.registration_number} (${handoverData.trailer_type})`);
+  doc.moveDown(0.8);
+
+  doc.fontSize(12).text('Wyposażenie – porównanie', { underline: true });
+  doc.moveDown(0.3);
+  doc.fontSize(10);
+  doc.text(`Dokumenty: przekazano ${handoverData.has_documents ? 'TAK' : 'NIE'} → zwrócono ${returnData.return_has_documents ? 'TAK' : 'NIE'}`);
+  doc.text(`Belki: przekazano ${handoverData.beams_count} szt. → zwrócono ${returnData.return_beams_count} szt.`);
+  doc.text(`Pasy: przekazano ${handoverData.straps_count} szt. → zwrócono ${returnData.return_straps_count} szt.`);
   doc.moveDown(0.8);
 
   if (returnData.notes) {

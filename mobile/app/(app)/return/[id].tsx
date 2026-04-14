@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, ScrollView, StyleSheet, ActivityIndicator,
-  TouchableOpacity, Alert, Platform, Linking, Image,
+  TouchableOpacity, Alert, Platform, Linking, Image, Switch,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -39,6 +39,10 @@ export default function ReturnScreen() {
     new Date().toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })
   );
   const [notes, setNotes] = useState('');
+
+  const [returnHasDocuments, setReturnHasDocuments] = useState(false);
+  const [returnBeamsCount, setReturnBeamsCount] = useState('');
+  const [returnStrapsCount, setReturnStrapsCount] = useState('');
 
   const [returnPhotos, setReturnPhotos] = useState<Record<string, ZonePhoto | undefined>>({});
   const [capturePosition, setCapturePosition] = useState<PhotoPosition | null>(null);
@@ -100,6 +104,9 @@ export default function ReturnScreen() {
       formData.append('return_date', returnDate);
       formData.append('return_time', returnTime);
       formData.append('notes', notes);
+      formData.append('return_has_documents', returnHasDocuments ? '1' : '0');
+      formData.append('return_beams_count', returnBeamsCount || '0');
+      formData.append('return_straps_count', returnStrapsCount || '0');
 
       const photoEntries = Object.values(returnPhotos).filter(Boolean) as ZonePhoto[];
       for (const photo of photoEntries) {
@@ -205,6 +212,53 @@ export default function ReturnScreen() {
         <TextInput style={[styles.input, styles.textArea]} value={notes} onChangeText={setNotes}
           placeholder={t('return.notes')} placeholderTextColor={Colors.gray400}
           multiline numberOfLines={3} />
+      </View>
+
+      {/* Equipment check */}
+      <View style={styles.section}>
+        <Text style={styles.equipSectionTitle}>
+          {t('return.documents')} / {t('return.beams')} / {t('return.straps')}
+        </Text>
+        {handover.has_documents !== undefined && (
+          <Text style={styles.equipHint}>
+            {t('handover.documents')}: {handover.has_documents ? t('common.yes') : t('common.no')} |{' '}
+            {t('handover.beams')}: {handover.beams_count ?? 0} szt. |{' '}
+            {t('handover.straps')}: {handover.straps_count ?? 0} szt.
+          </Text>
+        )}
+
+        <Text style={styles.label}>{t('return.returnDocuments')}</Text>
+        <View style={styles.switchRow}>
+          <Switch
+            value={returnHasDocuments}
+            onValueChange={setReturnHasDocuments}
+            trackColor={{ false: Colors.gray200, true: Colors.primary }}
+            thumbColor={Colors.white}
+          />
+          <Text style={styles.switchLabel}>
+            {returnHasDocuments ? t('common.yes') : t('common.no')}
+          </Text>
+        </View>
+
+        <Text style={styles.label}>{t('return.returnBeams')}</Text>
+        <TextInput
+          style={styles.input}
+          value={returnBeamsCount}
+          onChangeText={setReturnBeamsCount}
+          placeholder="0"
+          placeholderTextColor={Colors.gray400}
+          keyboardType="number-pad"
+        />
+
+        <Text style={styles.label}>{t('return.returnStraps')}</Text>
+        <TextInput
+          style={styles.input}
+          value={returnStrapsCount}
+          onChangeText={setReturnStrapsCount}
+          placeholder="0"
+          placeholderTextColor={Colors.gray400}
+          keyboardType="number-pad"
+        />
       </View>
 
       {/* Comparison: original photos + new photos */}
@@ -397,6 +451,29 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   textArea: { minHeight: 80, textAlignVertical: 'top' },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.xs,
+  },
+  switchLabel: {
+    fontSize: FontSize.md,
+    color: Colors.text,
+    fontWeight: '500',
+  },
+  equipSectionTitle: {
+    fontSize: FontSize.sm,
+    fontWeight: '700',
+    color: Colors.text,
+    marginBottom: Spacing.xs,
+  },
+  equipHint: {
+    fontSize: FontSize.xs,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.sm,
+    fontStyle: 'italic',
+  },
   comparisonCard: {
     backgroundColor: Colors.white,
     borderRadius: BorderRadius.md,

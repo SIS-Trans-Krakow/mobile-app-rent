@@ -22,6 +22,8 @@ export interface ZonePhoto {
   description: string;
   hasIssue?: boolean;
   issueDescription?: string;
+  isPreloaded?: boolean;
+  preloadedFilePath?: string;
 }
 
 interface Props {
@@ -58,6 +60,7 @@ export default function TrailerTemplate({ photos, onZonePress, readOnly, origina
     const photo = photos[position];
     const hasPhoto = !!photo;
     const hasIssue = photo?.hasIssue;
+    const isPreloaded = photo?.isPreloaded;
 
     const handlePress = () => {
       if (readOnly) {
@@ -74,6 +77,7 @@ export default function TrailerTemplate({ photos, onZonePress, readOnly, origina
           styles.zone,
           hasPhoto && styles.zoneWithPhoto,
           hasIssue && styles.zoneWithIssue,
+          isPreloaded && !hasIssue && styles.zonePreloaded,
           style,
         ]}
         onPress={handlePress}
@@ -85,6 +89,11 @@ export default function TrailerTemplate({ photos, onZonePress, readOnly, origina
           <Text style={styles.zoneText}>{t(POSITION_LABELS[position])}</Text>
         )}
         {hasIssue && <View style={styles.issueBadge}><Text style={styles.issueBadgeText}>!</Text></View>}
+        {isPreloaded && !hasIssue && (
+          <View style={styles.preloadedBadge}>
+            <Text style={styles.preloadedBadgeText}>↩</Text>
+          </View>
+        )}
         {readOnly && hasPhoto && (
           <View style={styles.zoomHint}>
             <Text style={styles.zoomHintText}>🔍</Text>
@@ -152,6 +161,9 @@ export default function TrailerTemplate({ photos, onZonePress, readOnly, origina
           <Image source={{ uri: photo!.uri }} style={styles.thumbSmall} />
           <View style={styles.photoDescContent}>
             <Text style={styles.photoDescLabel}>{t(POSITION_LABELS[pos as PhotoPosition])}</Text>
+            {photo!.isPreloaded && (
+              <Text style={styles.preloadedLabel}>↩ z ostatniego zwrotu</Text>
+            )}
             {photo!.description ? <Text style={styles.photoDescText}>{photo!.description}</Text> : null}
             {photo!.hasIssue && (
               <Text style={styles.issueText}>{photo!.issueDescription}</Text>
@@ -208,6 +220,10 @@ const styles = StyleSheet.create({
     borderColor: Colors.danger,
     borderStyle: 'solid',
   },
+  zonePreloaded: {
+    borderColor: Colors.warning,
+    borderStyle: 'solid',
+  },
   zoneImage: {
     width: '100%',
     height: '100%',
@@ -253,6 +269,22 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
+  preloadedBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: Colors.warning,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  preloadedBadgeText: {
+    color: Colors.white,
+    fontSize: 11,
+    fontWeight: '700',
+  },
   zoomHint: {
     position: 'absolute',
     bottom: 2,
@@ -292,6 +324,12 @@ const styles = StyleSheet.create({
   issueText: {
     fontSize: FontSize.xs,
     color: Colors.danger,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  preloadedLabel: {
+    fontSize: FontSize.xs,
+    color: Colors.warning,
     fontWeight: '600',
     marginTop: 2,
   },

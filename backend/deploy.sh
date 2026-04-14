@@ -377,15 +377,20 @@ if [ "$ACTION" = "init" ]; then
         remote_sudo "npm install -g pm2"
         ok "PM2 installed"
     else
-        ok "PM2 already present"
+        ok "PM2 already present (other apps untouched)"
     fi
-    remote "pm2 install pm2-logrotate && \
-        pm2 set pm2-logrotate:max_size 500M && \
-        pm2 set pm2-logrotate:retain 7 && \
-        pm2 set pm2-logrotate:compress true && \
-        pm2 set pm2-logrotate:rotateInterval '0 0 * * *' && \
-        pm2 set pm2-logrotate:rotateModule true"
-    ok "pm2-logrotate configured (7-day retention, 500M max, daily rotate)"
+    # Only configure logrotate if not already installed (shared server safety)
+    if ! remote "pm2 describe pm2-logrotate >/dev/null 2>&1"; then
+        remote "pm2 install pm2-logrotate && \
+            pm2 set pm2-logrotate:max_size 500M && \
+            pm2 set pm2-logrotate:retain 7 && \
+            pm2 set pm2-logrotate:compress true && \
+            pm2 set pm2-logrotate:rotateInterval '0 0 * * *' && \
+            pm2 set pm2-logrotate:rotateModule true"
+        ok "pm2-logrotate configured (7-day retention, 500M max, daily rotate)"
+    else
+        ok "pm2-logrotate already present — skipping (keeping existing settings)"
+    fi
 
     # ── 4. Sync code ──────────────────────────────────────────────────────
     step "4/7" "Syncing project files..."
@@ -468,13 +473,13 @@ else
 fi
 
 step "4/5" "Ensuring pm2-logrotate..."
-remote "pm2 describe pm2-logrotate >/dev/null 2>&1 || pm2 install pm2-logrotate"
-remote "pm2 set pm2-logrotate:max_size 500M && \
+remote "pm2 describe pm2-logrotate >/dev/null 2>&1 || (pm2 install pm2-logrotate && \
+    pm2 set pm2-logrotate:max_size 500M && \
     pm2 set pm2-logrotate:retain 7 && \
     pm2 set pm2-logrotate:compress true && \
     pm2 set pm2-logrotate:rotateInterval '0 0 * * *' && \
-    pm2 set pm2-logrotate:rotateModule true"
-ok "Logrotate OK (7-day retention)"
+    pm2 set pm2-logrotate:rotateModule true)"
+ok "Logrotate OK"
 
 step "5/5" "Restarting PM2..."
 remote "cd ${DEPLOY_PATH} && pm2 restart ${PM2_APP} || pm2 start ecosystem.config.cjs"

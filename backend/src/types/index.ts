@@ -38,6 +38,9 @@ export interface Handover {
   handover_date: string;
   handover_time: string;
   equipment_notes: string;
+  has_documents: number;
+  beams_count: number;
+  straps_count: number;
   status: HandoverStatus;
   created_at: string;
 }
@@ -70,6 +73,9 @@ export interface Return {
   return_date: string;
   return_time: string;
   notes: string;
+  return_has_documents: number;
+  return_beams_count: number;
+  return_straps_count: number;
   created_at: string;
 }
 

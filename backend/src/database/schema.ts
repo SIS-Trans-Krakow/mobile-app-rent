@@ -23,6 +23,8 @@ export function getDb(): Database.Database {
     migrateTrailersTable(db);
     db.pragma('foreign_keys = ON');
     initSchema(db);
+    migrateHandoversEquipmentFields(db);
+    migrateReturnsEquipmentFields(db);
   }
   return db;
 }
@@ -103,6 +105,9 @@ function initSchema(db: Database.Database): void {
       handover_date TEXT NOT NULL,
       handover_time TEXT NOT NULL,
       equipment_notes TEXT NOT NULL DEFAULT '',
+      has_documents INTEGER NOT NULL DEFAULT 0,
+      beams_count INTEGER NOT NULL DEFAULT 0,
+      straps_count INTEGER NOT NULL DEFAULT 0,
       status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'returned')),
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (company_id) REFERENCES companies(id),
@@ -127,6 +132,9 @@ function initSchema(db: Database.Database): void {
       return_date TEXT NOT NULL,
       return_time TEXT NOT NULL,
       notes TEXT NOT NULL DEFAULT '',
+      return_has_documents INTEGER NOT NULL DEFAULT 0,
+      return_beams_count INTEGER NOT NULL DEFAULT 0,
+      return_straps_count INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (handover_id) REFERENCES handovers(id),
       FOREIGN KEY (created_by) REFERENCES users(id)
@@ -167,5 +175,46 @@ function initSchema(db: Database.Database): void {
       CREATE UNIQUE INDEX IF NOT EXISTS idx_trailers_registration_number_unique
       ON trailers(UPPER(TRIM(registration_number)));
     `);
+  }
+}
+
+function migrateHandoversEquipmentFields(db: Database.Database): void {
+  const columns = db.prepare('PRAGMA table_info(handovers)').all() as Array<{ name: string }>;
+  const names = columns.map((c) => c.name);
+
+  if (!names.includes('has_documents')) {
+    db.exec('ALTER TABLE handovers ADD COLUMN has_documents INTEGER NOT NULL DEFAULT 0');
+    console.log('[db] handovers: added has_documents');
+  }
+  if (!names.includes('beams_count')) {
+    db.exec('ALTER TABLE handovers ADD COLUMN beams_count INTEGER NOT NULL DEFAULT 0');
+    console.log('[db] handovers: added beams_count');
+  }
+  if (!names.includes('straps_count')) {
+    db.exec('ALTER TABLE handovers ADD COLUMN straps_count INTEGER NOT NULL DEFAULT 0');
+    console.log('[db] handovers: added straps_count');
+  }
+}
+
+function migrateReturnsEquipmentFields(db: Database.Database): void {
+  const tableExists = db.prepare(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='returns'"
+  ).get();
+  if (!tableExists) return;
+
+  const columns = db.prepare('PRAGMA table_info(returns)').all() as Array<{ name: string }>;
+  const names = columns.map((c) => c.name);
+
+  if (!names.includes('return_has_documents')) {
+    db.exec('ALTER TABLE returns ADD COLUMN return_has_documents INTEGER NOT NULL DEFAULT 0');
+    console.log('[db] returns: added return_has_documents');
+  }
+  if (!names.includes('return_beams_count')) {
+    db.exec('ALTER TABLE returns ADD COLUMN return_beams_count INTEGER NOT NULL DEFAULT 0');
+    console.log('[db] returns: added return_beams_count');
+  }
+  if (!names.includes('return_straps_count')) {
+    db.exec('ALTER TABLE returns ADD COLUMN return_straps_count INTEGER NOT NULL DEFAULT 0');
+    console.log('[db] returns: added return_straps_count');
   }
 }

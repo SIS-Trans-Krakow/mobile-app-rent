@@ -10,6 +10,7 @@ import api, { getUploadsUrl } from '../../../services/api';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../../constants/theme';
 import TrailerTemplate, { PhotoPosition, ZonePhoto } from '../../../components/TrailerTemplate';
 import PhotoCapture from '../../../components/PhotoCapture';
+import { showPlatformAlert } from '../../../utils/showPlatformAlert';
 
 const TRAILER_TYPES = ['Kurtyna', 'Box', 'Izoterma', 'Chłodnia', 'Kurtyna MEGA', 'TANDEM', 'Double Deck'] as const;
 
@@ -20,6 +21,8 @@ interface TrailerResult {
   brand: string;
   type: string;
   production_date: string;
+  active_handover_id?: number | null;
+  is_available_for_handover?: number | boolean;
 }
 
 const POSITION_LABELS: Record<PhotoPosition, string> = {
@@ -36,16 +39,24 @@ const POSITION_LABELS: Record<PhotoPosition, string> = {
 };
 const MIN_REQUIRED_POSITIONS: PhotoPosition[] = ['front', 'rear', 'left-side', 'right-side'];
 
+const getCompanySummaryLines = (line1: string, line2: string, postalCode: string) => {
+  return [line1.trim(), line2.trim()].filter(Boolean);
+};
+
 export default function NewHandoverScreen() {
   const { t } = useTranslation();
   const router = useRouter();
 
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
   // Company fields
   const [companyName, setCompanyName] = useState('');
-  const [companyAddress, setCompanyAddress] = useState('');
+  const [companyTaxId, setCompanyTaxId] = useState('');
+  const [companyAddressLine1, setCompanyAddressLine1] = useState('');
+  const [companyAddressLine2, setCompanyAddressLine2] = useState('');
+  const [companyPostalCode, setCompanyPostalCode] = useState('');
   const [companyPhone, setCompanyPhone] = useState('');
   const [companyEmail, setCompanyEmail] = useState('');
   const [companyContact, setCompanyContact] = useState('');
@@ -78,6 +89,13 @@ export default function NewHandoverScreen() {
   const [photos, setPhotos] = useState<Record<string, ZonePhoto | undefined>>({});
   const [capturePosition, setCapturePosition] = useState<PhotoPosition | null>(null);
   const [lastReturnDate, setLastReturnDate] = useState<string | null>(null);
+
+  const showError = (message: string) => {
+    setFeedbackMessage(message);
+    if (Platform.OS !== 'web') {
+      showPlatformAlert(t('common.error'), message);
+    }
+  };
 
   const searchTrailers = useCallback((query: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -113,14 +131,17 @@ export default function NewHandoverScreen() {
     const normalized = searchQuery.trim().toUpperCase();
     if (!normalized) return;
 
-    setRegistrationNumber(normalized);
-    setShowResults(false);
-    setSearchResults([]);
-
     const localExact = searchResults.find(
       (trailer) => trailer.registration_number.trim().toUpperCase() === normalized
     );
     if (localExact) {
+      if (!localExact.is_available_for_handover) {
+        showError(t('handover.trailerUnavailableForHandover'));
+        return;
+      }
+      setRegistrationNumber(normalized);
+      setShowResults(false);
+      setSearchResults([]);
       await selectTrailer(localExact);
       return;
     }
@@ -131,14 +152,32 @@ export default function NewHandoverScreen() {
         (trailer: TrailerResult) => trailer.registration_number.trim().toUpperCase() === normalized
       );
       if (exact) {
+        if (!exact.is_available_for_handover) {
+          showError(t('handover.trailerUnavailableForHandover'));
+          return;
+        }
+        setRegistrationNumber(normalized);
+        setShowResults(false);
+        setSearchResults([]);
         await selectTrailer(exact);
+        return;
       }
     } catch {
       // Keep manual entry when lookup fails.
     }
+
+    setRegistrationNumber(normalized);
+    setShowResults(false);
+    setSearchResults([]);
   };
 
   const selectTrailer = async (trailer: TrailerResult) => {
+    const isAvailable = Boolean(trailer.is_available_for_handover);
+    if (!isAvailable) {
+      showError(t('handover.trailerUnavailableForHandover'));
+      return;
+    }
+
     setSelectedTrailer(trailer);
     setSearchQuery(trailer.registration_number);
     setRegistrationNumber(trailer.registration_number);
@@ -212,13 +251,13 @@ export default function NewHandoverScreen() {
   const validateStep = (): boolean => {
     if (step === 0) {
       if (!companyName.trim()) {
-        Alert.alert(t('common.error'), t('common.required'));
+        showError(t('common.required'));
         return false;
       }
     } else if (step === 1) {
       const regNum = selectedTrailer ? selectedTrailer.registration_number : registrationNumber;
       if (!regNum.trim()) {
-        Alert.alert(t('common.error'), t('common.required'));
+        showError(t('common.required'));
         return false;
       }
     }
@@ -226,23 +265,25 @@ export default function NewHandoverScreen() {
   };
 
   const handleNext = () => {
+    setFeedbackMessage(null);
     if (validateStep()) setStep(step + 1);
   };
 
   const handleSubmit = async () => {
     if (loading) return;
+    setFeedbackMessage(null);
     const photoEntries = Object.values(photos).filter(Boolean) as ZonePhoto[];
     const addedPositions = new Set(photoEntries.map((photo) => photo.position));
     const missingRequiredPositions = MIN_REQUIRED_POSITIONS.filter((position) => !addedPositions.has(position));
     if (missingRequiredPositions.length > 0) {
       const missingLabels = missingRequiredPositions.map((position) => t(POSITION_LABELS[position])).join(', ');
-      Alert.alert(t('common.error'), t('handover.missingRequiredPhotos', { positions: missingLabels }));
+      showError(t('handover.missingRequiredPhotos', { positions: missingLabels }));
       return;
     }
 
     const invalidIssuePhoto = photoEntries.find((photo) => photo.hasIssue && !photo.issueDescription?.trim());
     if (invalidIssuePhoto) {
-      Alert.alert(
+      showPlatformAlert(
         t('common.error'),
         t('handover.issueDescriptionRequiredForPosition', { position: t(POSITION_LABELS[invalidIssuePhoto.position]) })
       );
@@ -253,7 +294,10 @@ export default function NewHandoverScreen() {
     try {
       const formData = new FormData();
       formData.append('company_name', companyName);
-      formData.append('company_address', companyAddress);
+      formData.append('company_tax_id', companyTaxId);
+      formData.append('company_address_line1', companyAddressLine1);
+      formData.append('company_address_line2', companyAddressLine2);
+      formData.append('company_postal_code', companyPostalCode);
       formData.append('company_phone', companyPhone);
       formData.append('company_email', companyEmail);
       formData.append('company_contact', companyContact);
@@ -312,11 +356,7 @@ export default function NewHandoverScreen() {
       }
     } catch (err: any) {
       const msg = err?.response?.data?.error || 'Error';
-      if (Platform.OS === 'web') {
-        window.alert(msg);
-      } else {
-        Alert.alert(t('common.error'), msg);
-      }
+      showError(msg);
     } finally {
       setLoading(false);
     }
@@ -330,9 +370,43 @@ export default function NewHandoverScreen() {
       <TextInput style={styles.input} value={companyName} onChangeText={setCompanyName}
         placeholder={t('handover.companyName')} placeholderTextColor={Colors.gray400} />
 
-      <Text style={styles.label}>{t('handover.companyAddress')}</Text>
-      <TextInput style={styles.input} value={companyAddress} onChangeText={setCompanyAddress}
-        placeholder={t('handover.companyAddress')} placeholderTextColor={Colors.gray400} />
+      <Text style={styles.label}>{t('handover.companyTaxId')}</Text>
+      <TextInput
+        style={styles.input}
+        value={companyTaxId}
+        onChangeText={setCompanyTaxId}
+        placeholder={t('handover.companyTaxId')}
+        placeholderTextColor={Colors.gray400}
+        keyboardType="number-pad"
+      />
+
+      <Text style={styles.label}>{t('handover.companyAddressLine1')}</Text>
+      <TextInput
+        style={styles.input}
+        value={companyAddressLine1}
+        onChangeText={setCompanyAddressLine1}
+        placeholder={t('handover.companyAddressLine1')}
+        placeholderTextColor={Colors.gray400}
+      />
+
+      <Text style={styles.label}>{t('handover.companyAddressLine2')}</Text>
+      <TextInput
+        style={styles.input}
+        value={companyAddressLine2}
+        onChangeText={setCompanyAddressLine2}
+        placeholder={t('handover.companyAddressLine2')}
+        placeholderTextColor={Colors.gray400}
+      />
+
+      <Text style={styles.label}>{t('handover.companyPostalCode')}</Text>
+      <TextInput
+        style={styles.input}
+        value={companyPostalCode}
+        onChangeText={setCompanyPostalCode}
+        placeholder={t('handover.companyPostalCode')}
+        placeholderTextColor={Colors.gray400}
+        keyboardType="numbers-and-punctuation"
+      />
 
       <Text style={styles.label}>{t('handover.companyPhone')}</Text>
       <TextInput style={styles.input} value={companyPhone} onChangeText={setCompanyPhone}
@@ -395,19 +469,50 @@ export default function NewHandoverScreen() {
                   {searchResults.map((trailer) => (
                     <TouchableOpacity
                       key={trailer.id}
-                      style={styles.resultItem}
+                      style={[
+                        styles.resultItem,
+                        !trailer.is_available_for_handover && styles.resultItemDisabled,
+                      ]}
                       onPress={() => selectTrailer(trailer)}
+                      disabled={!trailer.is_available_for_handover}
                       accessibilityRole="button"
                       accessible
                       accessibilityLabel={`${trailer.registration_number}`}
+                      accessibilityState={{ disabled: !trailer.is_available_for_handover }}
                     >
                       <View style={styles.resultMain}>
-                        <Text style={styles.resultReg}>{trailer.registration_number}</Text>
-                        <Text style={styles.resultMeta}>
+                        <Text
+                          style={[
+                            styles.resultReg,
+                            !trailer.is_available_for_handover && styles.resultTextDisabled,
+                          ]}
+                        >
+                          {trailer.registration_number}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.resultMeta,
+                            !trailer.is_available_for_handover && styles.resultTextDisabled,
+                          ]}
+                        >
                           {[trailer.brand, t(`trailer.types.${trailer.type}`)].filter(Boolean).join(' · ')}
                         </Text>
                       </View>
-                      {trailer.vin ? <Text style={styles.resultVin}>VIN: {trailer.vin}</Text> : null}
+                      {!trailer.is_available_for_handover ? (
+                        <Text style={styles.resultUnavailableText}>
+                          {t('handover.unavailableUntilReturn')}
+                        </Text>
+                      ) : null}
+                      {trailer.vin ? (
+                        <Text
+                          style={[
+                            styles.resultVin,
+                            !trailer.is_available_for_handover && styles.resultTextDisabled,
+                          ]}
+                        >
+                          VIN: {trailer.vin}
+                        </Text>
+                      ) : null}
                     </TouchableOpacity>
                   ))}
                   <TouchableOpacity
@@ -571,12 +676,23 @@ export default function NewHandoverScreen() {
   const renderSummary = () => {
     const photoEntries = Object.values(photos).filter(Boolean) as ZonePhoto[];
     const issuePhotos = photoEntries.filter((p) => p.hasIssue);
+    const companyAddressLines = getCompanySummaryLines(
+      companyAddressLine1,
+      companyAddressLine2,
+      companyPostalCode
+    );
 
     return (
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Text style={styles.sectionTitle}>{t('handover.company')}</Text>
         <Text style={styles.summaryText}>{companyName}</Text>
-        {companyAddress ? <Text style={styles.summaryDetail}>{companyAddress}</Text> : null}
+        {companyTaxId ? <Text style={styles.summaryDetail}>NIP: {companyTaxId}</Text> : null}
+        {companyAddressLines.map((line) => (
+          <Text key={line} style={styles.summaryDetail}>{line}</Text>
+        ))}
+        {companyPostalCode ? (
+          <Text style={styles.summaryDetail}>{t('handover.companyPostalCode')}: {companyPostalCode}</Text>
+        ) : null}
         {companyContact ? <Text style={styles.summaryDetail}>{companyContact}</Text> : null}
 
         <Text style={styles.sectionTitle}>{t('handover.trailer')}</Text>
@@ -648,12 +764,22 @@ export default function NewHandoverScreen() {
         {steps[step]()}
       </View>
 
+      {Platform.OS === 'web' && feedbackMessage ? (
+        <View style={styles.feedbackBanner}>
+          <Ionicons name="alert-circle" size={18} color={Colors.danger} />
+          <Text style={styles.feedbackText}>{feedbackMessage}</Text>
+        </View>
+      ) : null}
+
       {/* Navigation */}
       <View style={styles.nav}>
         {step > 0 && (
           <TouchableOpacity
             style={[styles.navBtnSecondary, loading && styles.navBtnDisabled]}
-            onPress={() => setStep(step - 1)}
+            onPress={() => {
+              setFeedbackMessage(null);
+              setStep(step - 1);
+            }}
             disabled={loading}
             accessibilityRole="button"
             accessible
@@ -819,6 +945,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Colors.border,
   },
+  resultItemDisabled: {
+    backgroundColor: Colors.gray100,
+  },
   resultMain: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -827,6 +956,13 @@ const styles = StyleSheet.create({
   resultReg: { fontSize: FontSize.md, fontWeight: '700', color: Colors.text },
   resultMeta: { fontSize: FontSize.sm, color: Colors.textSecondary },
   resultVin: { fontSize: FontSize.xs, color: Colors.gray400, marginTop: 2 },
+  resultTextDisabled: { color: Colors.gray400 },
+  resultUnavailableText: {
+    fontSize: FontSize.xs,
+    color: Colors.warning,
+    fontWeight: '600',
+    marginTop: 4,
+  },
   resultHint: { fontSize: FontSize.sm, color: Colors.textSecondary, fontStyle: 'italic' },
   resultItemManual: {
     flexDirection: 'row',
@@ -858,6 +994,24 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.sm,
   },
   manualBadgeText: { fontSize: FontSize.xs, color: Colors.warning, fontWeight: '600' },
+  feedbackBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginHorizontal: Spacing.md,
+    marginBottom: Spacing.xs,
+    padding: Spacing.sm,
+    backgroundColor: '#fef2f2',
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: Colors.danger,
+  },
+  feedbackText: {
+    flex: 1,
+    fontSize: FontSize.sm,
+    color: Colors.danger,
+    fontWeight: '600',
+  },
   typeChipDisabled: { opacity: 0.5 },
   typeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   typeChip: {

@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Image, StyleSheet,
-  Modal, Alert, Switch,
+  Modal, Platform, Switch,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, FontSize, BorderRadius } from '../constants/theme';
 import { PhotoPosition, ZonePhoto } from './TrailerTemplate';
+import { showPlatformAlert } from '../utils/showPlatformAlert';
 
 const POSITION_LABELS: Record<PhotoPosition, string> = {
   'front': 'photos.front',
@@ -50,6 +51,14 @@ export default function PhotoCapture({
   const [description, setDescription] = useState(buildInitialState().description);
   const [hasIssue, setHasIssue] = useState(buildInitialState().hasIssue);
   const [issueDescription, setIssueDescription] = useState(buildInitialState().issueDescription);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const showError = (message: string) => {
+    setErrorMessage(message);
+    if (Platform.OS !== 'web') {
+      showPlatformAlert(t('common.error'), message);
+    }
+  };
 
   useEffect(() => {
     if (!visible) return;
@@ -58,12 +67,13 @@ export default function PhotoCapture({
     setDescription(initial.description);
     setHasIssue(initial.hasIssue);
     setIssueDescription(initial.issueDescription);
+    setErrorMessage(null);
   }, [visible, existingPhoto, originalPhoto]);
 
   const takePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert(t('common.error'), t('photos.cameraPermissionRequired'));
+      showError(t('photos.cameraPermissionRequired'));
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
@@ -81,19 +91,21 @@ export default function PhotoCapture({
       allowsEditing: false,
     });
     if (!result.canceled && result.assets[0]) {
+      setErrorMessage(null);
       setUri(result.assets[0].uri);
     }
   };
 
   const handleSave = () => {
     if (!uri) {
-      Alert.alert(t('common.error'), t('photos.takePhoto'));
+      showError(t('photos.takePhoto'));
       return;
     }
     if (showIssueFields && hasIssue && !issueDescription.trim()) {
-      Alert.alert(t('common.error'), t('return.issueDescriptionRequired'));
+      showError(t('return.issueDescriptionRequired'));
       return;
     }
+    setErrorMessage(null);
     onSave({
       uri,
       position,
@@ -126,6 +138,12 @@ export default function PhotoCapture({
             <Text style={styles.saveText}>{t('common.save')}</Text>
           </TouchableOpacity>
         </View>
+
+        {Platform.OS === 'web' && errorMessage ? (
+          <View style={styles.errorBanner}>
+            <Text style={styles.errorText}>{errorMessage}</Text>
+          </View>
+        ) : null}
 
         {originalPhoto && (
           <View style={[styles.originalSection, originalPhoto.hasIssue && styles.originalSectionIssue]}>
@@ -319,5 +337,19 @@ const styles = StyleSheet.create({
     marginHorizontal: 0,
     marginTop: Spacing.sm,
     borderColor: Colors.danger,
+  },
+  errorBanner: {
+    marginHorizontal: Spacing.md,
+    marginTop: Spacing.md,
+    padding: Spacing.sm,
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: Colors.danger,
+    borderRadius: BorderRadius.sm,
+  },
+  errorText: {
+    color: Colors.danger,
+    fontSize: FontSize.sm,
+    fontWeight: '600',
   },
 });

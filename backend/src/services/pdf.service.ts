@@ -32,7 +32,10 @@ interface HandoverData {
   straps_count: number;
   status: string;
   company_name: string;
-  company_address: string;
+  company_address_line1: string;
+  company_address_line2: string;
+  company_postal_code: string;
+  company_tax_id: string;
   company_phone: string;
   company_email: string;
   company_contact: string;
@@ -67,6 +70,14 @@ interface ReturnData {
     has_issue: number;
     issue_description: string;
   }>;
+}
+
+interface IssuerCompanyProfile {
+  name: string;
+  address: string;
+  tax_id: string;
+  phone: string;
+  email: string;
 }
 
 let resolvedFontPath: string | null | undefined;
@@ -144,8 +155,20 @@ function drawImageOrPlaceholder(
   }
 }
 
-export function generateHandoverPdf(data: HandoverData): PDFKit.PDFDocument {
+function getCompanyAddressLines(data: HandoverData): string[] {
+  const lines = [data.company_address_line1, data.company_address_line2].filter(Boolean);
+  if (data.company_postal_code) {
+    lines.push(`Kod pocztowy: ${data.company_postal_code}`);
+  }
+  return lines;
+}
+
+export function generateHandoverPdf(
+  data: HandoverData,
+  issuerCompany: IssuerCompanyProfile
+): PDFKit.PDFDocument {
   const doc = createPdfDocument();
+  const companyAddressLines = getCompanyAddressLines(data);
 
   doc.fontSize(20).text('Protokół przekazania naczepy', { align: 'center' });
   doc.moveDown(0.5);
@@ -161,11 +184,26 @@ export function generateHandoverPdf(data: HandoverData): PDFKit.PDFDocument {
   doc.text(`Status: ${data.status === 'active' ? 'Aktywne' : 'Zwrócone'}`);
   doc.moveDown(0.8);
 
-  doc.fontSize(12).text('Firma', { underline: true });
+  doc.fontSize(12).text('Firma przekazująca', { underline: true });
+  doc.moveDown(0.3);
+  doc.fontSize(10);
+  doc.text(`Nazwa: ${issuerCompany.name || '-'}`);
+  doc.text(`Adres: ${issuerCompany.address || '-'}`);
+  doc.text(`NIP: ${issuerCompany.tax_id || '-'}`);
+  doc.text(`Telefon: ${issuerCompany.phone || '-'}`);
+  doc.text(`E-mail: ${issuerCompany.email || '-'}`);
+  doc.moveDown(0.8);
+
+  doc.fontSize(12).text('Firma odbierająca', { underline: true });
   doc.moveDown(0.3);
   doc.fontSize(10);
   doc.text(`Nazwa: ${data.company_name}`);
-  doc.text(`Adres: ${data.company_address}`);
+  if (data.company_tax_id) {
+    doc.text(`NIP: ${data.company_tax_id}`);
+  }
+  companyAddressLines.forEach((line, index) => {
+    doc.text(`${index === 0 ? 'Adres' : 'Adres cd.'}: ${line}`);
+  });
   doc.text(`Telefon: ${data.company_phone}`);
   doc.text(`E-mail: ${data.company_email}`);
   doc.text(`Osoba kontaktowa: ${data.company_contact}`);
@@ -239,7 +277,11 @@ export function generateHandoverPdf(data: HandoverData): PDFKit.PDFDocument {
   return doc;
 }
 
-export function generateReturnPdf(handoverData: HandoverData, returnData: ReturnData): PDFKit.PDFDocument {
+export function generateReturnPdf(
+  handoverData: HandoverData,
+  returnData: ReturnData,
+  issuerCompany: IssuerCompanyProfile
+): PDFKit.PDFDocument {
   const doc = createPdfDocument();
 
   doc.fontSize(20).text('Protokół zwrotu naczepy', { align: 'center' });
@@ -253,6 +295,16 @@ export function generateReturnPdf(handoverData: HandoverData, returnData: Return
   doc.text(`Data zwrotu: ${returnData.return_date}`);
   doc.text(`Godzina zwrotu: ${returnData.return_time}`);
   doc.text(`Sporządził: ${returnData.created_by_name}`);
+  doc.moveDown(0.8);
+
+  doc.fontSize(12).text('Firma przekazująca', { underline: true });
+  doc.moveDown(0.3);
+  doc.fontSize(10);
+  doc.text(`Nazwa: ${issuerCompany.name || '-'}`);
+  doc.text(`Adres: ${issuerCompany.address || '-'}`);
+  doc.text(`NIP: ${issuerCompany.tax_id || '-'}`);
+  doc.text(`Telefon: ${issuerCompany.phone || '-'}`);
+  doc.text(`E-mail: ${issuerCompany.email || '-'}`);
   doc.moveDown(0.8);
 
   doc.fontSize(12).text('Dane przekazania', { underline: true });

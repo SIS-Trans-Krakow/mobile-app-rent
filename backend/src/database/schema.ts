@@ -23,6 +23,7 @@ export function getDb(): Database.Database {
     migrateTrailersTable(db);
     db.pragma('foreign_keys = ON');
     initSchema(db);
+    migrateCompaniesFields(db);
     migrateHandoversEquipmentFields(db);
     migrateReturnsEquipmentFields(db);
     migrateHandoverPhotosIssueFields(db);
@@ -84,9 +85,22 @@ function initSchema(db: Database.Database): void {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
       address TEXT NOT NULL DEFAULT '',
+      address_line1 TEXT NOT NULL DEFAULT '',
+      address_line2 TEXT NOT NULL DEFAULT '',
+      postal_code TEXT NOT NULL DEFAULT '',
+      tax_id TEXT NOT NULL DEFAULT '',
       phone TEXT NOT NULL DEFAULT '',
       email TEXT NOT NULL DEFAULT '',
       contact_person TEXT NOT NULL DEFAULT ''
+    );
+
+    CREATE TABLE IF NOT EXISTS issuer_company_profile (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      name TEXT NOT NULL DEFAULT '',
+      address TEXT NOT NULL DEFAULT '',
+      tax_id TEXT NOT NULL DEFAULT '',
+      phone TEXT NOT NULL DEFAULT '',
+      email TEXT NOT NULL DEFAULT ''
     );
 
     CREATE TABLE IF NOT EXISTS trailers (
@@ -176,6 +190,34 @@ function initSchema(db: Database.Database): void {
       CREATE UNIQUE INDEX IF NOT EXISTS idx_trailers_registration_number_unique
       ON trailers(UPPER(TRIM(registration_number)));
     `);
+  }
+}
+
+function migrateCompaniesFields(db: Database.Database): void {
+  const tableExists = db.prepare(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='companies'"
+  ).get();
+  if (!tableExists) return;
+
+  const columns = db.prepare('PRAGMA table_info(companies)').all() as Array<{ name: string }>;
+  const names = columns.map((c) => c.name);
+
+  if (!names.includes('address_line1')) {
+    db.exec("ALTER TABLE companies ADD COLUMN address_line1 TEXT NOT NULL DEFAULT ''");
+    db.exec("UPDATE companies SET address_line1 = address WHERE TRIM(address_line1) = ''");
+    console.log('[db] companies: added address_line1');
+  }
+  if (!names.includes('address_line2')) {
+    db.exec("ALTER TABLE companies ADD COLUMN address_line2 TEXT NOT NULL DEFAULT ''");
+    console.log('[db] companies: added address_line2');
+  }
+  if (!names.includes('postal_code')) {
+    db.exec("ALTER TABLE companies ADD COLUMN postal_code TEXT NOT NULL DEFAULT ''");
+    console.log('[db] companies: added postal_code');
+  }
+  if (!names.includes('tax_id')) {
+    db.exec("ALTER TABLE companies ADD COLUMN tax_id TEXT NOT NULL DEFAULT ''");
+    console.log('[db] companies: added tax_id');
   }
 }
 

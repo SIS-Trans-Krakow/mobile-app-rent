@@ -12,9 +12,21 @@ export interface Company {
   id: number;
   name: string;
   address: string;
+  address_line1: string;
+  address_line2: string;
+  postal_code: string;
+  tax_id: string;
   phone: string;
   email: string;
   contact_person: string;
+}
+
+export interface IssuerCompanyProfile {
+  name: string;
+  address: string;
+  tax_id: string;
+  phone: string;
+  email: string;
 }
 
 export type TrailerType = 'Kurtyna' | 'Box' | 'Izoterma' | 'Chłodnia' | 'Kurtyna MEGA' | 'TANDEM' | 'Double Deck';

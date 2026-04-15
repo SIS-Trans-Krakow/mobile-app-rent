@@ -9,14 +9,30 @@ router.use(authenticate);
 router.get('/', (req: Request, res: Response) => {
   const db = getDb();
   const { search } = req.query;
-  let query = 'SELECT * FROM trailers';
+  let query = `
+    SELECT
+      t.*,
+      (
+        SELECT h.id
+        FROM handovers h
+        WHERE h.trailer_id = t.id AND h.status = 'active'
+        ORDER BY h.id DESC
+        LIMIT 1
+      ) as active_handover_id,
+      CASE WHEN EXISTS (
+        SELECT 1
+        FROM handovers h
+        WHERE h.trailer_id = t.id AND h.status = 'active'
+      ) THEN 0 ELSE 1 END as is_available_for_handover
+    FROM trailers t
+  `;
   const params: any[] = [];
   if (search && typeof search === 'string' && search.trim()) {
-    query += ' WHERE registration_number LIKE ? OR vin LIKE ? OR brand LIKE ?';
+    query += ' WHERE t.registration_number LIKE ? OR t.vin LIKE ? OR t.brand LIKE ?';
     const term = `%${search.trim()}%`;
     params.push(term, term, term);
   }
-  query += ' ORDER BY registration_number';
+  query += ' ORDER BY t.registration_number';
   const trailers = db.prepare(query).all(...params);
   res.json(trailers);
 });

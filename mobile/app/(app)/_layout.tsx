@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../stores/auth';
 import { Colors } from '../../constants/theme';
+import { webConstrainedWidthStyle } from '../../constants/layout';
 
 export default function AppLayout() {
   const { t } = useTranslation();
@@ -23,6 +24,7 @@ export default function AppLayout() {
           borderTopWidth: 0.5,
           paddingBottom: 4,
           height: 52,
+          ...webConstrainedWidthStyle,
         },
         tabBarLabelStyle: { fontSize: 11, fontWeight: '500' },
         headerStyle: {
@@ -31,9 +33,14 @@ export default function AppLayout() {
           elevation: 0,
           borderBottomWidth: 0.5,
           borderBottomColor: Colors.border,
+          ...webConstrainedWidthStyle,
         },
         headerTintColor: Colors.text,
         headerTitleStyle: { fontWeight: '600', fontSize: 17 },
+        sceneStyle: {
+          backgroundColor: Colors.background,
+          ...webConstrainedWidthStyle,
+        },
       }}
     >
       <Tabs.Screen

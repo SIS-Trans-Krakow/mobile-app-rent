@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator,
+  View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -19,11 +19,15 @@ interface HandoverItem {
   issue_count?: number;
 }
 
+type StatusFilter = 'all' | 'active' | 'returned';
+
 export default function HandoverListScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const [handovers, setHandovers] = useState<HandoverItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [registrationQuery, setRegistrationQuery] = useState('');
 
   useFocusEffect(
     useCallback(() => {
@@ -42,6 +46,15 @@ export default function HandoverListScreen() {
     }
   };
 
+  const normalizedQuery = registrationQuery.trim().toUpperCase();
+  const filteredHandovers = handovers.filter((item) => {
+    const matchesStatus = statusFilter === 'all' || item.status === statusFilter;
+    const matchesRegistration = !normalizedQuery
+      || item.registration_number.toUpperCase().includes(normalizedQuery);
+
+    return matchesStatus && matchesRegistration;
+  });
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -52,8 +65,58 @@ export default function HandoverListScreen() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.filters}>
+        <View style={styles.searchBox}>
+          <Ionicons name="search" size={18} color={Colors.gray400} />
+          <TextInput
+            style={styles.searchInput}
+            value={registrationQuery}
+            onChangeText={setRegistrationQuery}
+            placeholder={t('handover.filterByRegistration')}
+            placeholderTextColor={Colors.gray400}
+            autoCapitalize="characters"
+          />
+        </View>
+
+        <View style={styles.statusRow}>
+          {(['all', 'active', 'returned'] as StatusFilter[]).map((filter) => (
+            <TouchableOpacity
+              key={filter}
+              style={[
+                styles.filterChip,
+                statusFilter === filter && styles.filterChipActive,
+              ]}
+              onPress={() => setStatusFilter(filter)}
+              accessibilityRole="button"
+              accessible
+              accessibilityLabel={
+                filter === 'all'
+                  ? t('handover.filterAll')
+                  : filter === 'active'
+                    ? t('handover.active')
+                    : t('handover.returned')
+              }
+              accessibilityState={{ selected: statusFilter === filter }}
+            >
+              <Text
+                style={[
+                  styles.filterChipText,
+                  statusFilter === filter && styles.filterChipTextActive,
+                ]}
+              >
+                {filter === 'all'
+                  ? t('handover.filterAll')
+                  : filter === 'active'
+                    ? t('handover.active')
+                    : t('handover.returned')}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
       <FlatList
-        data={handovers}
+        data={filteredHandovers}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={styles.list}
         ListEmptyComponent={
@@ -112,6 +175,52 @@ export default function HandoverListScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  filters: {
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.xs,
+    gap: Spacing.sm,
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: Spacing.md,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: Spacing.md,
+    fontSize: FontSize.md,
+    color: Colors.text,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  filterChip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  filterChipActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  filterChipText: {
+    fontSize: FontSize.sm,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+  },
+  filterChipTextActive: {
+    color: Colors.white,
+  },
   list: { padding: Spacing.md },
   empty: { textAlign: 'center', color: Colors.textSecondary, marginTop: Spacing.xl },
   card: {

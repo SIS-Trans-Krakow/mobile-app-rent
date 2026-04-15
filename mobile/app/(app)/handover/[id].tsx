@@ -26,6 +26,10 @@ const POSITION_LABELS: Record<PhotoPosition, string> = {
   'rear-right': 'photos.rearRight',
 };
 
+const getCompanyAddressLines = (handover: any) => {
+  return [handover.company_address_line1, handover.company_address_line2].filter(Boolean);
+};
+
 export default function HandoverDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -126,6 +130,7 @@ export default function HandoverDetailScreen() {
   }
 
   const photos: Record<string, ZonePhoto | undefined> = {};
+  const companyAddressLines = getCompanyAddressLines(handover);
   for (const photo of handover.photos || []) {
     photos[photo.position_on_template] = {
       uri: getUploadsUrl(photo.file_path),
@@ -190,7 +195,13 @@ export default function HandoverDetailScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t('handover.company')}</Text>
         <Text style={styles.value}>{handover.company_name}</Text>
-        {handover.company_address ? <Text style={styles.detail}>{handover.company_address}</Text> : null}
+        {handover.company_tax_id ? <Text style={styles.detail}>NIP: {handover.company_tax_id}</Text> : null}
+        {companyAddressLines.map((line: string) => (
+          <Text key={line} style={styles.detail}>{line}</Text>
+        ))}
+        {handover.company_postal_code ? (
+          <Text style={styles.detail}>{t('handover.companyPostalCode')}: {handover.company_postal_code}</Text>
+        ) : null}
         {handover.company_phone ? <Text style={styles.detail}>{handover.company_phone}</Text> : null}
         {handover.company_email ? <Text style={styles.detail}>{handover.company_email}</Text> : null}
         {handover.company_contact ? <Text style={styles.detail}>{t('handover.companyContact')}: {handover.company_contact}</Text> : null}

@@ -27,6 +27,21 @@ export default function AdminMenuScreen() {
 
       <TouchableOpacity
         style={styles.card}
+        onPress={() => router.push('/(app)/admin/company-profile')}
+        activeOpacity={0.7}
+      >
+        <View style={[styles.iconContainer, { backgroundColor: '#f5f3ff' }]}>
+          <Ionicons name="business-outline" size={28} color="#7c3aed" />
+        </View>
+        <View style={styles.cardContent}>
+          <Text style={styles.cardTitle}>{t('admin.companyProfile')}</Text>
+          <Text style={styles.cardDescription}>{t('admin.companyProfileDesc')}</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={Colors.gray400} />
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.card}
         onPress={() => router.push('/(app)/admin/trailers')}
         activeOpacity={0.7}
       >

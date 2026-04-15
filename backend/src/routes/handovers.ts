@@ -62,7 +62,11 @@ router.get('/', (req: Request, res: Response) => {
 router.get('/:id', (req: Request, res: Response) => {
   const db = getDb();
   const handover = db.prepare(`
-    SELECT h.*, c.name as company_name, c.address as company_address,
+    SELECT h.*, c.name as company_name,
+           COALESCE(NULLIF(c.address_line1, ''), c.address) as company_address_line1,
+           c.address_line2 as company_address_line2,
+           c.postal_code as company_postal_code,
+           c.tax_id as company_tax_id,
            c.phone as company_phone, c.email as company_email, c.contact_person as company_contact,
            t.registration_number, t.vin, t.brand, t.type as trailer_type,
            t.production_date, u.full_name as created_by_name
@@ -104,7 +108,8 @@ router.post('/', upload.array('photos', 20), async (req: Request, res: Response)
   try {
     const db = getDb();
     const {
-      company_name, company_address, company_phone, company_email, company_contact,
+      company_name, company_address_line1, company_address_line2, company_postal_code,
+      company_tax_id, company_phone, company_email, company_contact,
       company_id: existingCompanyId,
       registration_number, vin, brand, trailer_type, production_date,
       trailer_id: existingTrailerId,
@@ -118,35 +123,105 @@ router.post('/', upload.array('photos', 20), async (req: Request, res: Response)
 
     const normalizedCompanyName = (company_name || '').trim();
     const normalizedCompanyContact = (company_contact || '').trim();
+    const normalizedCompanyAddressLine1 = (company_address_line1 || '').trim();
+    const normalizedCompanyAddressLine2 = (company_address_line2 || '').trim();
+    const normalizedCompanyPostalCode = (company_postal_code || '').trim();
+    const normalizedCompanyTaxId = (company_tax_id || '').trim();
+    const legacyCompanyAddress = [
+      normalizedCompanyAddressLine1,
+      normalizedCompanyAddressLine2,
+      normalizedCompanyPostalCode,
+    ].filter(Boolean).join(', ');
     const normalizedRegistration = (registration_number || '').trim();
 
     let companyId = existingCompanyId ? Number(existingCompanyId) : null;
     if (!companyId) {
+      let matchedCompany:
+        | {
+            id: number;
+            address: string;
+            address_line1: string;
+            address_line2: string;
+            postal_code: string;
+            tax_id: string;
+            phone: string;
+            email: string;
+            contact_person: string;
+          }
+        | undefined;
+
       if (!normalizedCompanyName) {
         res.status(400).json({ error: 'Company name is required' });
         return;
       }
 
       const companies = db.prepare(
-        `SELECT id, contact_person
+        `SELECT id, address, address_line1, address_line2, postal_code, tax_id, phone, email, contact_person
          FROM companies
          WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))
          ORDER BY id DESC`
-      ).all(normalizedCompanyName) as Array<{ id: number; contact_person: string }>;
+      ).all(normalizedCompanyName) as Array<{
+        id: number;
+        address: string;
+        address_line1: string;
+        address_line2: string;
+        postal_code: string;
+        tax_id: string;
+        phone: string;
+        email: string;
+        contact_person: string;
+      }>;
 
       if (companies.length > 0) {
         if (!normalizedCompanyContact) {
-          companyId = companies[0].id;
+          matchedCompany = companies[0];
         } else {
           const exactContactMatch = companies.find(
             (company) => (company.contact_person || '').trim().toLowerCase() === normalizedCompanyContact.toLowerCase()
           );
-          companyId = exactContactMatch ? exactContactMatch.id : companies[0].id;
+          matchedCompany = exactContactMatch || companies[0];
         }
+
+        companyId = matchedCompany.id;
+
+        db.prepare(`
+          UPDATE companies
+          SET address = ?,
+              address_line1 = ?,
+              address_line2 = ?,
+              postal_code = ?,
+              tax_id = ?,
+              phone = ?,
+              email = ?,
+              contact_person = ?
+          WHERE id = ?
+        `).run(
+          legacyCompanyAddress || matchedCompany.address || '',
+          normalizedCompanyAddressLine1 || matchedCompany.address_line1 || matchedCompany.address || '',
+          normalizedCompanyAddressLine2 || matchedCompany.address_line2 || '',
+          normalizedCompanyPostalCode || matchedCompany.postal_code || '',
+          normalizedCompanyTaxId || matchedCompany.tax_id || '',
+          (company_phone || '').trim() || matchedCompany.phone || '',
+          (company_email || '').trim() || matchedCompany.email || '',
+          normalizedCompanyContact || matchedCompany.contact_person || '',
+          companyId
+        );
       } else {
         const result = db.prepare(
-          'INSERT INTO companies (name, address, phone, email, contact_person) VALUES (?, ?, ?, ?, ?)'
-        ).run(normalizedCompanyName, company_address || '', company_phone || '', company_email || '', company_contact || '');
+          `INSERT INTO companies (
+            name, address, address_line1, address_line2, postal_code, tax_id, phone, email, contact_person
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).run(
+          normalizedCompanyName,
+          legacyCompanyAddress,
+          normalizedCompanyAddressLine1,
+          normalizedCompanyAddressLine2,
+          normalizedCompanyPostalCode,
+          normalizedCompanyTaxId,
+          (company_phone || '').trim(),
+          (company_email || '').trim(),
+          normalizedCompanyContact
+        );
         companyId = Number(result.lastInsertRowid);
       }
     }
@@ -173,6 +248,21 @@ router.post('/', upload.array('photos', 20), async (req: Request, res: Response)
         ).run(normalizedRegistration, vin || '', brand || '', trailer_type, production_date || '');
         trailerId = Number(result.lastInsertRowid);
       }
+    }
+
+    const activeHandover = db.prepare(
+      `SELECT h.id, t.registration_number
+       FROM handovers h
+       JOIN trailers t ON t.id = h.trailer_id
+       WHERE h.trailer_id = ? AND h.status = 'active'
+       LIMIT 1`
+    ).get(trailerId) as { id: number; registration_number: string } | undefined;
+
+    if (activeHandover) {
+      res.status(409).json({
+        error: `Trailer ${activeHandover.registration_number} is already handed over and must be returned first`,
+      });
+      return;
     }
 
     const handoverResult = db.prepare(`

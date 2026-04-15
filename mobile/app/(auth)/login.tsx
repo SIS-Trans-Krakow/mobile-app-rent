@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../stores/auth';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../constants/theme';
+import { webAuthConstrainedWidthStyle } from '../../constants/layout';
 
 export default function LoginScreen() {
   const { t, i18n } = useTranslation();
@@ -39,7 +40,7 @@ export default function LoginScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <View style={styles.inner}>
+      <View style={[styles.inner, webAuthConstrainedWidthStyle]}>
         <View style={styles.header}>
           <Text style={styles.icon}>🚛</Text>
           <Text style={styles.title}>Trailer Handover</Text>

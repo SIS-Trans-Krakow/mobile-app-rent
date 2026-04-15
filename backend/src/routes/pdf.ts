@@ -6,10 +6,31 @@ import { generateHandoverPdf, generateReturnPdf } from '../services/pdf.service'
 const router = Router();
 router.use(authenticate);
 
+function getIssuerCompanyProfile() {
+  const db = getDb();
+  return (
+    db.prepare(
+      'SELECT name, address, tax_id, phone, email FROM issuer_company_profile WHERE id = 1'
+    ).get() as
+      | { name: string; address: string; tax_id: string; phone: string; email: string }
+      | undefined
+  ) ?? {
+    name: '',
+    address: '',
+    tax_id: '',
+    phone: '',
+    email: '',
+  };
+}
+
 router.get('/handover/:id', (req: Request, res: Response) => {
   const db = getDb();
   const handover = db.prepare(`
-    SELECT h.*, c.name as company_name, c.address as company_address,
+    SELECT h.*, c.name as company_name,
+           COALESCE(NULLIF(c.address_line1, ''), c.address) as company_address_line1,
+           c.address_line2 as company_address_line2,
+           c.postal_code as company_postal_code,
+           c.tax_id as company_tax_id,
            c.phone as company_phone, c.email as company_email, c.contact_person as company_contact,
            t.registration_number, t.vin, t.brand, t.type as trailer_type,
            t.production_date,
@@ -35,7 +56,7 @@ router.get('/handover/:id', (req: Request, res: Response) => {
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename=przekazanie_${handover.id}.pdf`);
 
-  const doc = generateHandoverPdf(handover);
+  const doc = generateHandoverPdf(handover, getIssuerCompanyProfile());
   doc.pipe(res);
   doc.end();
 });
@@ -60,7 +81,11 @@ router.get('/return/:id', (req: Request, res: Response) => {
   returnRecord.photos = returnPhotos;
 
   const handover = db.prepare(`
-    SELECT h.*, c.name as company_name, c.address as company_address,
+    SELECT h.*, c.name as company_name,
+           COALESCE(NULLIF(c.address_line1, ''), c.address) as company_address_line1,
+           c.address_line2 as company_address_line2,
+           c.postal_code as company_postal_code,
+           c.tax_id as company_tax_id,
            c.phone as company_phone, c.email as company_email, c.contact_person as company_contact,
            t.registration_number, t.vin, t.brand, t.type as trailer_type,
            t.production_date,
@@ -80,7 +105,7 @@ router.get('/return/:id', (req: Request, res: Response) => {
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename=zwrot_${returnRecord.id}.pdf`);
 
-  const doc = generateReturnPdf(handover, returnRecord);
+  const doc = generateReturnPdf(handover, returnRecord, getIssuerCompanyProfile());
   doc.pipe(res);
   doc.end();
 });

@@ -131,6 +131,7 @@
     "pickFromGallery": "Wybierz z galerii",
     "description": "Opis zdjęcia",
     "tapZone": "Dotknij strefę na szablonie aby dodać zdjęcie",
+    "requiredMarker": "zdjęcie obowiązkowe",
     "inheritedFromLastReturn": "↩ z ostatniego zwrotu",
     "inheritedIssue": "Uszkodzenie odziedziczone",
     "newIssue": "Nowe uszkodzenie",

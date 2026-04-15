@@ -131,6 +131,7 @@
     "pickFromGallery": "Pick from Gallery",
     "description": "Photo description",
     "tapZone": "Tap a zone on the template to add a photo",
+    "requiredMarker": "required photo",
     "inheritedFromLastReturn": "↩ from last return",
     "inheritedIssue": "Inherited issue",
     "newIssue": "New issue",

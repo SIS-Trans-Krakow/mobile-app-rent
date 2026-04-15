@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import api, { getUploadsUrl } from '../../../services/api';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../../constants/theme';
-import TrailerTemplate, { PhotoPosition, ZonePhoto } from '../../../components/TrailerTemplate';
+import TrailerTemplate, { PhotoPosition, ZonePhoto, REQUIRED_POSITIONS } from '../../../components/TrailerTemplate';
 import PhotoCapture from '../../../components/PhotoCapture';
 import { showPlatformAlert } from '../../../utils/showPlatformAlert';
 
@@ -37,8 +37,6 @@ const POSITION_LABELS: Record<PhotoPosition, string> = {
   'rear-left': 'photos.rearLeft',
   'rear-right': 'photos.rearRight',
 };
-const MIN_REQUIRED_POSITIONS: PhotoPosition[] = ['front', 'rear', 'left-side', 'right-side'];
-
 const getCompanySummaryLines = (line1: string, line2: string, postalCode: string) => {
   return [line1.trim(), line2.trim()].filter(Boolean);
 };
@@ -274,7 +272,7 @@ export default function NewHandoverScreen() {
     setFeedbackMessage(null);
     const photoEntries = Object.values(photos).filter(Boolean) as ZonePhoto[];
     const addedPositions = new Set(photoEntries.map((photo) => photo.position));
-    const missingRequiredPositions = MIN_REQUIRED_POSITIONS.filter((position) => !addedPositions.has(position));
+    const missingRequiredPositions = REQUIRED_POSITIONS.filter((position) => !addedPositions.has(position));
     if (missingRequiredPositions.length > 0) {
       const missingLabels = missingRequiredPositions.map((position) => t(POSITION_LABELS[position])).join(', ');
       showError(t('handover.missingRequiredPhotos', { positions: missingLabels }));

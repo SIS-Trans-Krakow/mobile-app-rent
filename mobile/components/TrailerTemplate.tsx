@@ -52,6 +52,8 @@ export const ALL_POSITIONS: PhotoPosition[] = [
   'rear-left', 'rear-right',
 ];
 
+export const REQUIRED_POSITIONS: PhotoPosition[] = ['front', 'rear', 'left-side', 'right-side'];
+
 export default function TrailerTemplate({ photos, onZonePress, readOnly, onPhotoPress }: Props) {
   const { t } = useTranslation();
 
@@ -60,6 +62,7 @@ export default function TrailerTemplate({ photos, onZonePress, readOnly, onPhoto
     const hasPhoto = !!photo;
     const hasIssue = photo?.hasIssue;
     const isPreloaded = photo?.isPreloaded;
+    const isRequired = REQUIRED_POSITIONS.includes(position);
 
     const handlePress = () => {
       if (readOnly) {
@@ -77,6 +80,7 @@ export default function TrailerTemplate({ photos, onZonePress, readOnly, onPhoto
         key={position}
         style={[
           styles.zone,
+          isRequired && !hasPhoto && styles.zoneRequired,
           hasPhoto && styles.zoneWithPhoto,
           hasIssue && styles.zoneWithIssue,
           isPreloaded && !hasIssue && styles.zonePreloaded,
@@ -92,7 +96,10 @@ export default function TrailerTemplate({ photos, onZonePress, readOnly, onPhoto
         {hasPhoto ? (
           <Image source={{ uri: photo.uri }} style={styles.zoneImage} />
         ) : (
-          <Text style={styles.zoneText}>{t(POSITION_LABELS[position])}</Text>
+          <Text style={[styles.zoneText, isRequired && styles.zoneTextRequired]}>
+            {t(POSITION_LABELS[position])}
+            {isRequired ? ' *' : ''}
+          </Text>
         )}
         {hasIssue && <View style={styles.issueBadge}><Text style={styles.issueBadgeText}>!</Text></View>}
         {isPreloaded && !hasIssue && (
@@ -114,44 +121,53 @@ export default function TrailerTemplate({ photos, onZonePress, readOnly, onPhoto
       <Text style={styles.hint}>
         {readOnly ? '' : t('photos.tapZone')}
       </Text>
+      {!readOnly && (
+        <Text style={styles.requiredHint}>* {t('photos.requiredMarker')}</Text>
+      )}
 
       <View style={styles.trailer}>
-        {/* Front row */}
-        <View style={styles.row}>
-          <View style={styles.cornerSpace} />
-          {renderZone('front', styles.wideZone)}
-          <View style={styles.cornerSpace} />
-        </View>
-
-        {/* Front corners */}
-        <View style={styles.row}>
-          {renderZone('front-left')}
-          <View style={styles.spacer} />
-          {renderZone('front-right')}
-        </View>
-
-        {/* Middle: left, top/interior, right */}
-        <View style={styles.row}>
-          {renderZone('left-side', styles.sideZone)}
-          <View style={styles.middleColumn}>
-            {renderZone('top', styles.middleZone)}
-            {renderZone('interior', styles.middleZone)}
+        <View style={styles.trailerFrame}>
+          <View style={styles.hitch}>
+            <View style={styles.hitchStem} />
+            <View style={styles.hitchPlate} />
           </View>
-          {renderZone('right-side', styles.sideZone)}
-        </View>
 
-        {/* Rear corners */}
-        <View style={styles.row}>
-          {renderZone('rear-left')}
-          <View style={styles.spacer} />
-          {renderZone('rear-right')}
-        </View>
+          <View style={styles.trailerBody}>
+            <View style={styles.capRow}>
+              {renderZone('front', styles.wideZone)}
+            </View>
 
-        {/* Rear row */}
-        <View style={styles.row}>
-          <View style={styles.cornerSpace} />
-          {renderZone('rear', styles.wideZone)}
-          <View style={styles.cornerSpace} />
+            <View style={styles.cornerRow}>
+              {renderZone('front-left', styles.cornerZone)}
+              <View style={styles.cornerSpacer} />
+              {renderZone('front-right', styles.cornerZone)}
+            </View>
+
+            <View style={styles.bodyShell}>
+              {renderZone('left-side', styles.sideZone)}
+              <View style={styles.middleColumn}>
+                {renderZone('top', styles.middleZone)}
+                {renderZone('interior', styles.middleZone)}
+              </View>
+              {renderZone('right-side', styles.sideZone)}
+            </View>
+
+            <View style={styles.cornerRow}>
+              {renderZone('rear-left', styles.cornerZone)}
+              <View style={styles.cornerSpacer} />
+              {renderZone('rear-right', styles.cornerZone)}
+            </View>
+
+            <View style={styles.capRow}>
+              {renderZone('rear', styles.wideZone)}
+            </View>
+
+            <View style={styles.axleRow} pointerEvents="none">
+              <View style={styles.wheel} />
+              <View style={styles.wheel} />
+              <View style={styles.wheel} />
+            </View>
+          </View>
         </View>
       </View>
 
@@ -201,20 +217,79 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: Colors.textSecondary,
     fontSize: FontSize.sm,
+    marginBottom: Spacing.xs,
+  },
+  requiredHint: {
+    textAlign: 'center',
+    color: Colors.primaryDark,
+    fontSize: FontSize.xs,
+    fontWeight: '600',
     marginBottom: Spacing.md,
   },
   trailer: {
+    borderWidth: 1,
+    borderColor: Colors.gray200,
+    borderRadius: BorderRadius.lg,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.sm,
+    backgroundColor: Colors.gray50,
+    marginBottom: Spacing.sm,
+  },
+  trailerFrame: {
+    width: '100%',
+    maxWidth: 420,
+    alignSelf: 'center',
+    alignItems: 'center',
+  },
+  hitch: {
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+  },
+  hitchStem: {
+    width: 18,
+    height: 16,
+    backgroundColor: Colors.gray300,
+    borderTopLeftRadius: BorderRadius.sm,
+    borderTopRightRadius: BorderRadius.sm,
+  },
+  hitchPlate: {
+    width: 56,
+    height: 12,
+    marginTop: 2,
+    backgroundColor: Colors.gray300,
+    borderRadius: BorderRadius.full,
+  },
+  trailerBody: {
+    width: '100%',
     borderWidth: 2,
     borderColor: Colors.gray300,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.sm,
-    backgroundColor: Colors.gray50,
+    borderRadius: 24,
+    paddingTop: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingBottom: Spacing.md,
+    backgroundColor: Colors.white,
+    shadowColor: Colors.black,
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
   },
-  row: {
+  capRow: {
+    alignItems: 'center',
+    marginVertical: 2,
+  },
+  cornerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 2,
+    justifyContent: 'space-between',
+    marginTop: Spacing.xs,
+  },
+  cornerZone: {
+    width: 88,
+    height: 60,
+  },
+  cornerSpacer: {
+    flex: 1,
   },
   zone: {
     width: 72,
@@ -233,6 +308,10 @@ const styles = StyleSheet.create({
     borderColor: Colors.success,
     borderStyle: 'solid',
   },
+  zoneRequired: {
+    borderColor: Colors.primaryLight,
+    backgroundColor: '#eff6ff',
+  },
   zoneWithIssue: {
     borderColor: Colors.danger,
     borderStyle: 'solid',
@@ -247,29 +326,57 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.sm - 2,
   },
   zoneText: {
-    fontSize: 9,
+    fontSize: 10,
     color: Colors.gray500,
     textAlign: 'center',
     paddingHorizontal: 2,
+    fontWeight: '600',
+  },
+  zoneTextRequired: {
+    color: Colors.primaryDark,
   },
   wideZone: {
-    width: 160,
-    height: 56,
+    width: 200,
+    height: 58,
   },
   sideZone: {
-    width: 56,
-    height: 140,
+    width: 64,
+    height: 168,
+  },
+  bodyShell: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    justifyContent: 'space-between',
+    marginTop: Spacing.sm,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.xs,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.white,
   },
   middleColumn: {
     flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.xs,
   },
   middleZone: {
-    width: 140,
-    height: 66,
+    width: '100%',
+    maxWidth: 190,
+    height: 72,
   },
-  spacer: { flex: 1 },
-  cornerSpace: { width: 76 },
+  axleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-evenly',
+    marginTop: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+  },
+  wheel: {
+    width: 34,
+    height: 12,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.gray800,
+    opacity: 0.9,
+  },
   issueBadge: {
     position: 'absolute',
     top: 2,

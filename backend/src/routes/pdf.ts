@@ -47,6 +47,33 @@ router.get('/handover/:id', (req: Request, res: Response) => {
     return;
   }
 
+  const returnRecord = db.prepare(`
+    SELECT r.*, u.full_name as created_by_name
+    FROM returns r
+    JOIN users u ON r.created_by = u.id
+    WHERE r.handover_id = ?
+  `).get(Number(req.params.id)) as any;
+
+  if (returnRecord) {
+    const returnPhotos = db.prepare(
+      'SELECT * FROM return_photos WHERE return_id = ? ORDER BY id'
+    ).all(returnRecord.id);
+    returnRecord.photos = returnPhotos;
+
+    const handoverPhotos = db.prepare(
+      'SELECT * FROM handover_photos WHERE handover_id = ? ORDER BY id'
+    ).all(Number(req.params.id));
+    handover.photos = handoverPhotos;
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=zwrot_${returnRecord.id}.pdf`);
+
+    const returnDoc = generateReturnPdf(handover, returnRecord, getIssuerCompanyProfile());
+    returnDoc.pipe(res);
+    returnDoc.end();
+    return;
+  }
+
   const photos = db.prepare(
     'SELECT * FROM handover_photos WHERE handover_id = ? ORDER BY id'
   ).all(Number(req.params.id));

@@ -20,16 +20,25 @@ interface UserItem {
 
 export default function UsersScreen() {
   const { t } = useTranslation();
-  const { user } = useAuthStore();
+  const { user, updateUser } = useAuthStore();
   const [users, setUsers] = useState<UserItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editTargetUser, setEditTargetUser] = useState<UserItem | null>(null);
+  const [editFullName, setEditFullName] = useState('');
+  const [savingName, setSavingName] = useState(false);
 
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newFullName, setNewFullName] = useState('');
   const [newRole, setNewRole] = useState<'admin' | 'user'>('user');
   const [creating, setCreating] = useState(false);
+  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
+  const [passwordTargetUser, setPasswordTargetUser] = useState<UserItem | null>(null);
+  const [passwordValue, setPasswordValue] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -72,6 +81,94 @@ export default function UsersScreen() {
       Alert.alert(t('common.error'), err?.response?.data?.error || 'Error');
     } finally {
       setCreating(false);
+    }
+  };
+
+  const openPasswordModal = (targetUser: UserItem) => {
+    setPasswordTargetUser(targetUser);
+    setPasswordValue('');
+    setPasswordConfirm('');
+    setPasswordModalVisible(true);
+  };
+
+  const openEditModal = (targetUser: UserItem) => {
+    setEditTargetUser(targetUser);
+    setEditFullName(targetUser.full_name);
+    setEditModalVisible(true);
+  };
+
+  const closeEditModal = (force = false) => {
+    if (savingName && !force) return;
+    setEditModalVisible(false);
+    setEditTargetUser(null);
+    setEditFullName('');
+  };
+
+  const closePasswordModal = (force = false) => {
+    if (changingPassword && !force) return;
+    setPasswordModalVisible(false);
+    setPasswordTargetUser(null);
+    setPasswordValue('');
+    setPasswordConfirm('');
+  };
+
+  const changePassword = async () => {
+    if (!passwordTargetUser) return;
+    if (!passwordValue.trim() || !passwordConfirm.trim()) {
+      Alert.alert(t('common.error'), t('common.required'));
+      return;
+    }
+    if (passwordValue.trim().length < 6) {
+      Alert.alert(t('common.error'), t('admin.passwordMinLength'));
+      return;
+    }
+    if (passwordValue !== passwordConfirm) {
+      Alert.alert(t('common.error'), t('admin.passwordsDoNotMatch'));
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      await api.patch(`/users/${passwordTargetUser.id}`, { password: passwordValue.trim() });
+      Alert.alert(t('common.success'), t('admin.passwordUpdated'));
+      closePasswordModal(true);
+    } catch (err: any) {
+      Alert.alert(t('common.error'), err?.response?.data?.error || 'Error');
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
+  const saveFullName = async () => {
+    if (!editTargetUser) return;
+    const trimmedName = editFullName.trim();
+    if (!trimmedName) {
+      Alert.alert(t('common.error'), t('common.required'));
+      return;
+    }
+
+    setSavingName(true);
+    try {
+      const res = await api.patch(`/users/${editTargetUser.id}`, { full_name: trimmedName });
+      const updatedUser = res.data as UserItem;
+
+      setUsers((prev) => prev.map((item) => (item.id === updatedUser.id ? updatedUser : item)));
+
+      if (user?.id === updatedUser.id) {
+        await updateUser({
+          id: user.id,
+          username: user.username,
+          full_name: updatedUser.full_name,
+          role: user.role,
+        });
+      }
+
+      Alert.alert(t('common.success'), t('admin.userUpdated'));
+      closeEditModal(true);
+    } catch (err: any) {
+      Alert.alert(t('common.error'), err?.response?.data?.error || 'Error');
+    } finally {
+      setSavingName(false);
     }
   };
 
@@ -132,6 +229,18 @@ export default function UsersScreen() {
                 {item.active ? t('admin.active') : t('admin.inactive')}
               </Text>
               <View style={styles.actionsRow}>
+                <TouchableOpacity
+                  style={styles.editIconBtn}
+                  onPress={() => openEditModal(item)}
+                >
+                  <Ionicons name="create-outline" size={18} color={Colors.primary} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.passwordIconBtn}
+                  onPress={() => openPasswordModal(item)}
+                >
+                  <Ionicons name="key-outline" size={18} color={Colors.primary} />
+                </TouchableOpacity>
                 <Switch
                   value={!!item.active}
                   onValueChange={() => toggleActive(item)}
@@ -208,6 +317,91 @@ export default function UsersScreen() {
           </View>
         </View>
       </Modal>
+
+      <Modal visible={editModalVisible} animationType="slide" presentationStyle="pageSheet">
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => closeEditModal()} disabled={savingName}>
+              <Ionicons name="close" size={28} color={Colors.text} />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>{t('admin.editUser')}</Text>
+            <View style={{ width: 28 }} />
+          </View>
+
+          <View style={styles.modalBody}>
+            {editTargetUser ? (
+              <Text style={styles.helperText}>
+                {t('admin.setFullNameFor', { username: editTargetUser.username })}
+              </Text>
+            ) : null}
+
+            <Text style={styles.label}>{t('admin.fullName')} *</Text>
+            <TextInput
+              style={styles.input}
+              value={editFullName}
+              onChangeText={setEditFullName}
+              placeholder={t('admin.fullName')}
+              placeholderTextColor={Colors.gray400}
+            />
+
+            <TouchableOpacity style={styles.createBtn} onPress={saveFullName} disabled={savingName}>
+              {savingName ? (
+                <ActivityIndicator color={Colors.white} />
+              ) : (
+                <Text style={styles.createBtnText}>{t('common.save')}</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={passwordModalVisible} animationType="slide" presentationStyle="pageSheet">
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => closePasswordModal()} disabled={changingPassword}>
+              <Ionicons name="close" size={28} color={Colors.text} />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>{t('admin.changePassword')}</Text>
+            <View style={{ width: 28 }} />
+          </View>
+
+          <View style={styles.modalBody}>
+            {passwordTargetUser ? (
+              <Text style={styles.helperText}>
+                {t('admin.setPasswordFor', { name: passwordTargetUser.full_name })}
+              </Text>
+            ) : null}
+
+            <Text style={styles.label}>{t('auth.password')} *</Text>
+            <TextInput
+              style={styles.input}
+              value={passwordValue}
+              onChangeText={setPasswordValue}
+              secureTextEntry
+              placeholder={t('auth.password')}
+              placeholderTextColor={Colors.gray400}
+            />
+
+            <Text style={styles.label}>{t('admin.confirmPassword')} *</Text>
+            <TextInput
+              style={styles.input}
+              value={passwordConfirm}
+              onChangeText={setPasswordConfirm}
+              secureTextEntry
+              placeholder={t('admin.confirmPassword')}
+              placeholderTextColor={Colors.gray400}
+            />
+
+            <TouchableOpacity style={styles.createBtn} onPress={changePassword} disabled={changingPassword}>
+              {changingPassword ? (
+                <ActivityIndicator color={Colors.white} />
+              ) : (
+                <Text style={styles.createBtnText}>{t('admin.changePassword')}</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -234,6 +428,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
+  },
+  passwordIconBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    backgroundColor: '#eff6ff',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  editIconBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    backgroundColor: '#eff6ff',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   deleteIconBtn: {
     width: 32,
@@ -271,6 +485,11 @@ const styles = StyleSheet.create({
   },
   modalTitle: { fontSize: FontSize.lg, fontWeight: '600', color: Colors.text },
   modalBody: { padding: Spacing.lg },
+  helperText: {
+    fontSize: FontSize.sm,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.sm,
+  },
   label: {
     fontSize: FontSize.sm,
     fontWeight: '600',

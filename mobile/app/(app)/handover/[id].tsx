@@ -59,7 +59,10 @@ export default function HandoverDetailScreen() {
     try {
       const baseUrl = api.defaults.baseURL?.replace('/api', '');
       const token = getAccessToken();
-      const url = `${baseUrl}/api/pdf/handover/${id}?token=${token}`;
+      const pdfPath = handover?.return?.id
+        ? `/api/pdf/return/${handover.return.id}`
+        : `/api/pdf/handover/${id}`;
+      const url = `${baseUrl}${pdfPath}?token=${token}`;
 
       if (Platform.OS === 'web') {
         window.open(url, '_blank');

@@ -18,6 +18,7 @@ interface AuthState {
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   restoreSession: () => Promise<void>;
+  updateUser: (user: UserInfo) => Promise<void>;
 }
 
 async function saveToken(key: string, value: string) {
@@ -82,6 +83,11 @@ export const useAuthStore = create<AuthState>((set) => ({
     } catch {
       set({ isLoading: false });
     }
+  },
+
+  updateUser: async (user: UserInfo) => {
+    await saveToken('user', JSON.stringify(user));
+    set({ user });
   },
 }));
 

@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Image, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, Image, StyleSheet, ScrollView, ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Circle, Line, Rect } from 'react-native-svg';
 import { Colors, Spacing, FontSize, BorderRadius } from '../constants/theme';
 
 export type PhotoPosition =
@@ -54,10 +55,23 @@ export const ALL_POSITIONS: PhotoPosition[] = [
 
 export const REQUIRED_POSITIONS: PhotoPosition[] = ['front', 'rear', 'left-side', 'right-side'];
 
+const ZONE_LAYOUTS: Record<PhotoPosition, ViewStyle> = {
+  'front': { left: '31%', top: '6%', width: '38%', height: '7.5%' },
+  'front-left': { left: '17%', top: '18%', width: '14%', height: '12%' },
+  'front-right': { right: '17%', top: '18%', width: '14%', height: '12%' },
+  'left-side': { left: '14%', top: '31%', width: '12%', height: '36%' },
+  'right-side': { right: '14%', top: '31%', width: '12%', height: '36%' },
+  'top': { left: '31%', top: '18%', width: '38%', height: '13%' },
+  'interior': { left: '29%', top: '36%', width: '42%', height: '27%' },
+  'rear-left': { left: '17%', bottom: '14%', width: '14%', height: '12%' },
+  'rear-right': { right: '17%', bottom: '14%', width: '14%', height: '12%' },
+  'rear': { left: '31%', bottom: '5%', width: '38%', height: '7.5%' },
+};
+
 export default function TrailerTemplate({ photos, onZonePress, readOnly, onPhotoPress }: Props) {
   const { t } = useTranslation();
 
-  const renderZone = (position: PhotoPosition, style?: object) => {
+  const renderZone = (position: PhotoPosition, style?: ViewStyle) => {
     const photo = photos[position];
     const hasPhoto = !!photo;
     const hasIssue = photo?.hasIssue;
@@ -126,48 +140,64 @@ export default function TrailerTemplate({ photos, onZonePress, readOnly, onPhoto
       )}
 
       <View style={styles.trailer}>
-        <View style={styles.trailerFrame}>
-          <View style={styles.hitch}>
-            <View style={styles.hitchStem} />
-            <View style={styles.hitchPlate} />
+        <View style={styles.diagramFrame}>
+          <Text style={styles.directionLabel}>{t('photos.front')}</Text>
+
+          <View style={styles.diagramCanvas}>
+            <Svg width="100%" height="100%" viewBox="0 0 300 470" style={styles.diagramSvg}>
+              <Rect x="106" y="24" width="88" height="18" rx="2" fill="none" stroke={Colors.gray800} strokeWidth="3" />
+              <Rect x="136" y="8" width="28" height="10" rx="2" fill="none" stroke={Colors.gray800} strokeWidth="3" />
+              <Line x1="150" y1="18" x2="150" y2="24" stroke={Colors.gray800} strokeWidth="3" />
+
+              <Rect x="70" y="52" width="160" height="346" rx="4" fill="none" stroke={Colors.gray800} strokeWidth="3" />
+              <Rect x="80" y="64" width="140" height="36" fill="none" stroke={Colors.gray800} strokeWidth="3" />
+              <Rect x="80" y="108" width="140" height="76" fill="none" stroke={Colors.gray800} strokeWidth="3" />
+              <Rect x="80" y="192" width="140" height="126" fill="none" stroke={Colors.gray800} strokeWidth="3" />
+              <Rect x="80" y="326" width="140" height="48" fill="none" stroke={Colors.gray800} strokeWidth="3" />
+
+              <Line x1="96" y1="52" x2="96" y2="398" stroke={Colors.gray800} strokeWidth="3" />
+              <Line x1="204" y1="52" x2="204" y2="398" stroke={Colors.gray800} strokeWidth="3" />
+
+              <Rect x="84" y="320" width="10" height="58" fill="none" stroke={Colors.gray800} strokeWidth="3" />
+              <Rect x="206" y="320" width="10" height="58" fill="none" stroke={Colors.gray800} strokeWidth="3" />
+              <Line x1="79" y1="378" x2="99" y2="378" stroke={Colors.gray800} strokeWidth="3" />
+              <Line x1="201" y1="378" x2="221" y2="378" stroke={Colors.gray800} strokeWidth="3" />
+
+              <Line x1="70" y1="146" x2="54" y2="146" stroke={Colors.gray800} strokeWidth="3" />
+              <Line x1="70" y1="292" x2="54" y2="292" stroke={Colors.gray800} strokeWidth="3" />
+              <Line x1="230" y1="146" x2="246" y2="146" stroke={Colors.gray800} strokeWidth="3" />
+              <Line x1="230" y1="292" x2="246" y2="292" stroke={Colors.gray800} strokeWidth="3" />
+              <Rect x="48" y="132" width="6" height="28" fill="none" stroke={Colors.gray800} strokeWidth="3" />
+              <Rect x="48" y="278" width="6" height="28" fill="none" stroke={Colors.gray800} strokeWidth="3" />
+              <Rect x="246" y="132" width="6" height="28" fill="none" stroke={Colors.gray800} strokeWidth="3" />
+              <Rect x="246" y="278" width="6" height="28" fill="none" stroke={Colors.gray800} strokeWidth="3" />
+
+              <Circle cx="58" cy="320" r="10" fill="none" stroke={Colors.gray800} strokeWidth="3" />
+              <Circle cx="58" cy="350" r="10" fill="none" stroke={Colors.gray800} strokeWidth="3" />
+              <Circle cx="58" cy="380" r="10" fill="none" stroke={Colors.gray800} strokeWidth="3" />
+              <Circle cx="242" cy="320" r="10" fill="none" stroke={Colors.gray800} strokeWidth="3" />
+              <Circle cx="242" cy="350" r="10" fill="none" stroke={Colors.gray800} strokeWidth="3" />
+              <Circle cx="242" cy="380" r="10" fill="none" stroke={Colors.gray800} strokeWidth="3" />
+
+              <Rect x="86" y="406" width="128" height="24" fill="none" stroke={Colors.gray800} strokeWidth="3" />
+              <Line x1="150" y1="406" x2="150" y2="430" stroke={Colors.gray800} strokeWidth="3" />
+              <Line x1="126" y1="412" x2="126" y2="424" stroke={Colors.gray800} strokeWidth="3" />
+              <Line x1="174" y1="412" x2="174" y2="424" stroke={Colors.gray800} strokeWidth="3" />
+            </Svg>
+
+            {renderZone('front', ZONE_LAYOUTS['front'])}
+            {renderZone('front-left', ZONE_LAYOUTS['front-left'])}
+            {renderZone('front-right', ZONE_LAYOUTS['front-right'])}
+            {renderZone('left-side', ZONE_LAYOUTS['left-side'])}
+            {renderZone('right-side', ZONE_LAYOUTS['right-side'])}
+            {renderZone('top', ZONE_LAYOUTS['top'])}
+            {renderZone('interior', ZONE_LAYOUTS['interior'])}
+            {renderZone('rear-left', ZONE_LAYOUTS['rear-left'])}
+            {renderZone('rear-right', ZONE_LAYOUTS['rear-right'])}
+            {renderZone('rear', ZONE_LAYOUTS['rear'])}
           </View>
 
-          <View style={styles.trailerBody}>
-            <View style={styles.capRow}>
-              {renderZone('front', styles.wideZone)}
-            </View>
-
-            <View style={styles.cornerRow}>
-              {renderZone('front-left', styles.cornerZone)}
-              <View style={styles.cornerSpacer} />
-              {renderZone('front-right', styles.cornerZone)}
-            </View>
-
-            <View style={styles.bodyShell}>
-              {renderZone('left-side', styles.sideZone)}
-              <View style={styles.middleColumn}>
-                {renderZone('top', styles.middleZone)}
-                {renderZone('interior', styles.middleZone)}
-              </View>
-              {renderZone('right-side', styles.sideZone)}
-            </View>
-
-            <View style={styles.cornerRow}>
-              {renderZone('rear-left', styles.cornerZone)}
-              <View style={styles.cornerSpacer} />
-              {renderZone('rear-right', styles.cornerZone)}
-            </View>
-
-            <View style={styles.capRow}>
-              {renderZone('rear', styles.wideZone)}
-            </View>
-
-            <View style={styles.axleRow} pointerEvents="none">
-              <View style={styles.wheel} />
-              <View style={styles.wheel} />
-              <View style={styles.wheel} />
-            </View>
-          </View>
+          <Text style={styles.directionLabel}>{t('photos.rear')}</Text>
         </View>
       </View>
 
@@ -235,78 +265,45 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.gray50,
     marginBottom: Spacing.sm,
   },
-  trailerFrame: {
+  diagramFrame: {
     width: '100%',
-    maxWidth: 420,
+    maxWidth: 360,
     alignSelf: 'center',
     alignItems: 'center',
   },
-  hitch: {
-    alignItems: 'center',
-    marginBottom: Spacing.xs,
+  directionLabel: {
+    fontSize: 18,
+    fontStyle: 'italic',
+    color: Colors.gray700,
+    marginVertical: Spacing.sm,
   },
-  hitchStem: {
-    width: 18,
-    height: 16,
-    backgroundColor: Colors.gray300,
-    borderTopLeftRadius: BorderRadius.sm,
-    borderTopRightRadius: BorderRadius.sm,
-  },
-  hitchPlate: {
-    width: 56,
-    height: 12,
-    marginTop: 2,
-    backgroundColor: Colors.gray300,
-    borderRadius: BorderRadius.full,
-  },
-  trailerBody: {
+  diagramCanvas: {
     width: '100%',
-    borderWidth: 2,
-    borderColor: Colors.gray300,
-    borderRadius: 24,
-    paddingTop: Spacing.sm,
-    paddingHorizontal: Spacing.sm,
-    paddingBottom: Spacing.md,
+    aspectRatio: 300 / 430,
+    position: 'relative',
     backgroundColor: Colors.white,
-    shadowColor: Colors.black,
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
   },
-  capRow: {
-    alignItems: 'center',
-    marginVertical: 2,
-  },
-  cornerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: Spacing.xs,
-  },
-  cornerZone: {
-    width: 88,
-    height: 60,
-  },
-  cornerSpacer: {
-    flex: 1,
+  diagramSvg: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
   },
   zone: {
-    width: 72,
-    height: 72,
+    position: 'absolute',
     borderWidth: 2,
     borderColor: Colors.gray300,
     borderRadius: BorderRadius.sm,
     borderStyle: 'dashed',
     justifyContent: 'center',
     alignItems: 'center',
-    margin: 2,
-    backgroundColor: Colors.white,
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
     overflow: 'hidden',
+    paddingHorizontal: 4,
   },
   zoneWithPhoto: {
     borderColor: Colors.success,
     borderStyle: 'solid',
+    backgroundColor: Colors.white,
   },
   zoneRequired: {
     borderColor: Colors.primaryLight,
@@ -326,56 +323,13 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.sm - 2,
   },
   zoneText: {
-    fontSize: 10,
+    fontSize: 11,
     color: Colors.gray500,
     textAlign: 'center',
-    paddingHorizontal: 2,
     fontWeight: '600',
   },
   zoneTextRequired: {
     color: Colors.primaryDark,
-  },
-  wideZone: {
-    width: 200,
-    height: 58,
-  },
-  sideZone: {
-    width: 64,
-    height: 168,
-  },
-  bodyShell: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    justifyContent: 'space-between',
-    marginTop: Spacing.sm,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.xs,
-    borderRadius: BorderRadius.lg,
-    backgroundColor: Colors.white,
-  },
-  middleColumn: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.xs,
-  },
-  middleZone: {
-    width: '100%',
-    maxWidth: 190,
-    height: 72,
-  },
-  axleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-evenly',
-    marginTop: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-  },
-  wheel: {
-    width: 34,
-    height: 12,
-    borderRadius: BorderRadius.full,
-    backgroundColor: Colors.gray800,
-    opacity: 0.9,
   },
   issueBadge: {
     position: 'absolute',

@@ -129,6 +129,40 @@ export default function NewHandoverScreen() {
     clearSelectedCompany();
   };
 
+  const resetForm = () => {
+    setStep(0);
+    setFeedbackMessage(null);
+    setCompanyName('');
+    setCompanyTaxId('');
+    setCompanyAddressLine1('');
+    setCompanyAddressLine2('');
+    setCompanyPostalCode('');
+    setCompanyPhone('');
+    setCompanyEmail('');
+    setCompanyContact('');
+    setCompanyId(null);
+    setSaveCompanyToDb(false);
+    clearSelectedCompany();
+    setSearchQuery('');
+    setSearchResults([]);
+    setSearchLoading(false);
+    setShowResults(false);
+    setSelectedTrailer(null);
+    setRegistrationNumber('');
+    setVin('');
+    setBrand('');
+    setTrailerType(TRAILER_TYPES[0]);
+    setHandoverDate(new Date().toISOString().split('T')[0]);
+    setHandoverTime(new Date().toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }));
+    setHasDocuments(false);
+    setBeamsCount('');
+    setStrapsCount('');
+    setEquipmentNotes('');
+    setPhotos({});
+    setCapturePosition(null);
+    setLastReturnDate(null);
+  };
+
   const onCompanySearchChange = (text: string) => {
     if (companyId) {
       setCompanyId(null);
@@ -849,6 +883,26 @@ export default function NewHandoverScreen() {
 
       {/* Navigation */}
       <View style={styles.nav}>
+        <TouchableOpacity
+          style={styles.cancelBtn}
+          onPress={() => {
+            showPlatformAlert(
+              t('handover.cancelTitle'),
+              t('handover.cancelMessage'),
+              [
+                { text: t('handover.cancelNo'), style: 'cancel' },
+                { text: t('handover.cancelYes'), style: 'destructive', onPress: () => { resetForm(); router.replace('/'); } },
+              ]
+            );
+          }}
+          accessibilityRole='button'
+          accessible
+          accessibilityLabel={t('handover.cancel')}
+        >
+          <Ionicons name='close' size={16} color={Colors.danger} />
+          <Text style={styles.cancelBtnText}>{t('handover.cancel')}</Text>
+        </TouchableOpacity>
+
         {step > 0 && (
           <TouchableOpacity
             style={[styles.navBtnSecondary, loading && styles.navBtnDisabled]}
@@ -1104,6 +1158,17 @@ const styles = StyleSheet.create({
   },
   typeChipText: { fontSize: FontSize.sm, color: Colors.text },
   typeChipTextActive: { color: Colors.white, fontWeight: '600' },
+  cancelBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: Colors.danger,
+  },
+  cancelBtnText: { color: Colors.danger, fontSize: FontSize.sm, fontWeight: '600' },
   nav: {
     flexDirection: 'row',
     padding: Spacing.md,

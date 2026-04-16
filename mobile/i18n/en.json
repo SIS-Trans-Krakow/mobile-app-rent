@@ -43,6 +43,11 @@
   },
   "handover": {
     "new": "New Handover",
+    "cancel": "Cancel",
+    "cancelTitle": "Cancel?",
+    "cancelMessage": "Are you sure you want to cancel? All data will be lost.",
+    "cancelYes": "Yes, cancel",
+    "cancelNo": "No, go back",
     "edit": "Edit Handover",
     "detail": "Handover Details",
     "company": "Company",

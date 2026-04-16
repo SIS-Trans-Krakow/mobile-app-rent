@@ -43,6 +43,11 @@
   },
   "handover": {
     "new": "Nowe przekazanie",
+    "cancel": "Anuluj",
+    "cancelTitle": "Anulować?",
+    "cancelMessage": "Czy na pewno chcesz anulować? Wszystkie dane zostaną utracone.",
+    "cancelYes": "Tak, anuluj",
+    "cancelNo": "Nie, wróć",
     "edit": "Edycja przekazania",
     "detail": "Szczegóły przekazania",
     "company": "Firma",

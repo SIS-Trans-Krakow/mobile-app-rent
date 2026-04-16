@@ -35,8 +35,11 @@ export default function CompanyLookup({
   onClearSelection,
 }: CompanyLookupProps) {
   return (
-    <>
-      <Text style={styles.label}>{label}</Text>
+    <View style={styles.wrapper}>
+      <View style={styles.sectionHeader}>
+        <Ionicons name='server' size={16} color={Colors.primary} />
+        <Text style={styles.sectionLabel}>{label}</Text>
+      </View>
       <View style={styles.searchContainer}>
         <View style={styles.searchInputRow}>
           <Ionicons name="search" size={18} color={Colors.gray400} style={styles.searchIcon} />
@@ -109,17 +112,43 @@ export default function CompanyLookup({
           <Text style={styles.selectedBadgeText}>{selectedText}</Text>
         </View>
       ) : null}
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  wrapper: {
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    marginVertical: Spacing.sm,
+    shadowColor: Colors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+    paddingBottom: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  sectionLabel: {
+    fontSize: FontSize.md,
+    fontWeight: '600',
+    color: Colors.text,
+    marginLeft: Spacing.xs,
+  },
   label: {
     fontSize: FontSize.sm,
     fontWeight: '600',
     color: Colors.gray700,
     marginBottom: Spacing.xs,
-    marginTop: Spacing.sm,
   },
   searchContainer: { position: 'relative', zIndex: 20 },
   searchInputRow: {

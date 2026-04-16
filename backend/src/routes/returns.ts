@@ -9,6 +9,21 @@ import { convertToPdfCompatibleJpeg } from '../utils/image';
 const router = Router();
 router.use(authenticate);
 
+function normalizeIssueText(value: unknown): string {
+  return String(value || '').trim();
+}
+
+function mergeIssueDescriptions(baseText: string, deltaText: string): string {
+  const base = normalizeIssueText(baseText);
+  const delta = normalizeIssueText(deltaText);
+
+  if (!base) return delta;
+  if (!delta) return base;
+  if (base.toLowerCase() === delta.toLowerCase()) return base;
+
+  return `${base}; ${delta}`;
+}
+
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png']);
 const ALLOWED_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png']);
 
@@ -79,7 +94,7 @@ router.post('/', upload.array('photos', 20), async (req: Request, res: Response)
     const {
       handover_id, return_date, return_time, notes,
       return_has_documents, return_beams_count, return_straps_count,
-      photo_positions, photo_descriptions, photo_has_issues, photo_issue_descriptions,
+      photo_positions, photo_descriptions, photo_has_issues, photo_issue_descriptions, photo_new_issue_descriptions,
     } = req.body;
 
     if (!handover_id || !return_date || !return_time) {
@@ -104,6 +119,17 @@ router.post('/', upload.array('photos', 20), async (req: Request, res: Response)
     const descriptions = Array.isArray(photo_descriptions) ? photo_descriptions : photo_descriptions ? [photo_descriptions] : [];
     const hasIssues = Array.isArray(photo_has_issues) ? photo_has_issues : photo_has_issues ? [photo_has_issues] : [];
     const issueDescs = Array.isArray(photo_issue_descriptions) ? photo_issue_descriptions : photo_issue_descriptions ? [photo_issue_descriptions] : [];
+    const newIssueDescs = Array.isArray(photo_new_issue_descriptions)
+      ? photo_new_issue_descriptions
+      : photo_new_issue_descriptions ? [photo_new_issue_descriptions] : [];
+    const originalIssueRows = db.prepare(
+      'SELECT position_on_template, has_issue, issue_description FROM handover_photos WHERE handover_id = ?'
+    ).all(Number(handover_id)) as Array<{ position_on_template: string; has_issue: number; issue_description: string }>;
+    const originalIssueByPosition = new Map(
+      originalIssueRows
+        .filter((row) => row.has_issue)
+        .map((row) => [row.position_on_template, normalizeIssueText(row.issue_description)])
+    );
 
     const requiredRows = db.prepare(
       'SELECT DISTINCT position_on_template FROM handover_photos WHERE handover_id = ?'
@@ -130,11 +156,25 @@ router.post('/', upload.array('photos', 20), async (req: Request, res: Response)
     }
 
     for (let i = 0; i < files.length; i++) {
+      const position = (positions[i] || 'front').toString();
+      const originalIssue = originalIssueByPosition.get(position) || '';
+      const hasOriginalIssue = originalIssueByPosition.has(position);
       const hasIssue = hasIssues[i] === '1' || hasIssues[i] === 'true';
-      if (hasIssue && !String(issueDescs[i] || '').trim()) {
+      const normalizedNewIssue = normalizeIssueText(newIssueDescs[i]);
+      const normalizedCurrentIssue = normalizeIssueText(issueDescs[i]);
+
+      if (!hasOriginalIssue && hasIssue && !normalizedCurrentIssue) {
         res.status(400).json({
           error: 'Issue description is required when issue is marked',
-          position: positions[i] || 'front',
+          position,
+        });
+        return;
+      }
+
+      if (hasOriginalIssue && hasIssue && normalizedCurrentIssue !== originalIssue && !normalizedNewIssue) {
+        res.status(400).json({
+          error: 'New issue description is required when adding damage to an existing issue',
+          position,
         });
         return;
       }
@@ -157,17 +197,31 @@ router.post('/', upload.array('photos', 20), async (req: Request, res: Response)
     await Promise.all(files.map(f => convertToPdfCompatibleJpeg(path.join(UPLOADS_DIR, f.filename))));
 
     const insertPhoto = db.prepare(
-      'INSERT INTO return_photos (return_id, file_path, position_on_template, description, has_issue, issue_description) VALUES (?, ?, ?, ?, ?, ?)'
+      `INSERT INTO return_photos (
+        return_id, file_path, position_on_template, description, has_issue, issue_description, new_issue_description
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)`
     );
 
     for (let i = 0; i < files.length; i++) {
+      const position = (positions[i] || 'front').toString();
+      const originalIssue = originalIssueByPosition.get(position) || '';
+      const currentIssue = normalizeIssueText(issueDescs[i]);
+      const newIssue = normalizeIssueText(newIssueDescs[i]);
+      const hasOriginalIssue = Boolean(originalIssue);
+      const hasMarkedIssue = hasIssues[i] === '1' || hasIssues[i] === 'true';
+      const hasIssue = hasOriginalIssue || hasMarkedIssue;
+      const mergedIssue = hasIssue
+        ? mergeIssueDescriptions(originalIssue, newIssue || (!hasOriginalIssue ? currentIssue : ''))
+        : '';
+
       insertPhoto.run(
         returnId,
         files[i].filename,
-        positions[i] || 'front',
+        position,
         descriptions[i] || '',
-        hasIssues[i] === '1' || hasIssues[i] === 'true' ? 1 : 0,
-        issueDescs[i] || ''
+        hasIssue ? 1 : 0,
+        mergedIssue,
+        hasOriginalIssue ? newIssue : (hasIssue ? (newIssue || currentIssue) : '')
       );
     }
 

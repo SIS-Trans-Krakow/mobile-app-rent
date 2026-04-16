@@ -27,6 +27,7 @@ export function getDb(): Database.Database {
     migrateHandoversEquipmentFields(db);
     migrateReturnsEquipmentFields(db);
     migrateHandoverPhotosIssueFields(db);
+    migrateReturnPhotosDeltaFields(db);
   }
   return db;
 }
@@ -163,6 +164,7 @@ function initSchema(db: Database.Database): void {
       description TEXT NOT NULL DEFAULT '',
       has_issue INTEGER NOT NULL DEFAULT 0,
       issue_description TEXT NOT NULL DEFAULT '',
+      new_issue_description TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (return_id) REFERENCES returns(id) ON DELETE CASCADE
     );
@@ -278,5 +280,20 @@ function migrateHandoverPhotosIssueFields(db: Database.Database): void {
   if (!names.includes('issue_description')) {
     db.exec("ALTER TABLE handover_photos ADD COLUMN issue_description TEXT NOT NULL DEFAULT ''");
     console.log('[db] handover_photos: added issue_description');
+  }
+}
+
+function migrateReturnPhotosDeltaFields(db: Database.Database): void {
+  const tableExists = db.prepare(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='return_photos'"
+  ).get();
+  if (!tableExists) return;
+
+  const columns = db.prepare('PRAGMA table_info(return_photos)').all() as Array<{ name: string }>;
+  const names = columns.map((c) => c.name);
+
+  if (!names.includes('new_issue_description')) {
+    db.exec("ALTER TABLE return_photos ADD COLUMN new_issue_description TEXT NOT NULL DEFAULT ''");
+    console.log('[db] return_photos: added new_issue_description');
   }
 }

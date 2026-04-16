@@ -125,6 +125,7 @@ export default function ReturnScreen() {
         formData.append('photo_descriptions', photo.description || '');
         formData.append('photo_has_issues', photo.hasIssue ? '1' : '0');
         formData.append('photo_issue_descriptions', photo.issueDescription || '');
+        formData.append('photo_new_issue_descriptions', photo.newIssueDescription || '');
       }
 
       const res = await api.post('/returns', formData, {
@@ -402,7 +403,15 @@ export default function ReturnScreen() {
                   </TouchableOpacity>
                 )}
                 {returnPhoto?.hasIssue && returnPhoto.issueDescription ? (
-                  <Text style={styles.issueText}>{returnPhoto.issueDescription}</Text>
+                  original?.hasIssue ? (
+                    returnPhoto.hasNewIssue && returnPhoto.newIssueDescription ? (
+                      <Text style={styles.issueText}>{returnPhoto.newIssueDescription}</Text>
+                    ) : (
+                      <Text style={styles.noIssueText}>{t('return.noNewIssues')}</Text>
+                    )
+                  ) : (
+                    <Text style={styles.issueText}>{returnPhoto.issueDescription}</Text>
+                  )
                 ) : returnPhoto?.description ? (
                   <Text style={styles.compDesc}>{returnPhoto.description}</Text>
                 ) : returnPhoto ? (

@@ -65,6 +65,7 @@ interface HandoverPhoto {
   description: string;
   has_issue: number;
   issue_description: string;
+  new_issue_description?: string;
 }
 
 interface HandoverData {
@@ -605,6 +606,10 @@ function groupIssues(photos: HandoverPhoto[]): IssueGroup[] {
     .filter((item): item is IssueGroup => Boolean(item));
 }
 
+function normalizeIssueText(value?: string): string {
+  return value?.trim() || '';
+}
+
 function drawTrailerOutline(doc: PDFKit.PDFDocument, x: number, y: number, width: number, height: number): void {
   const px = (value: number) => x + value * width;
   const py = (value: number) => y + value * height;
@@ -1077,17 +1082,8 @@ export function generateReturnPdf(
   }
 
   const returnIssuePhotos = returnData.photos.filter((p) => p.has_issue);
-  const newIssues = returnIssuePhotos.filter((p) => !handoverIssuesByPos.has(p.position_on_template));
+  const newIssues = returnIssuePhotos.filter((p) => normalizeIssueText(p.new_issue_description));
   const continuedIssues = returnIssuePhotos.filter((p) => handoverIssuesByPos.has(p.position_on_template));
-  const newIssuesForDamageSection = returnIssuePhotos.filter((photo) => {
-    const originalIssue = handoverIssuesByPos.get(photo.position_on_template)?.trim();
-    const currentIssue = photo.issue_description?.trim() || '';
-
-    return !originalIssue || originalIssue !== currentIssue;
-  });
-  const resolvedIssues = handoverData.photos.filter(
-    (p) => p.has_issue && !returnData.photos.find((r) => r.position_on_template === p.position_on_template && r.has_issue)
-  );
 
   doc.addPage();
   y = doc.page.margins.top;
@@ -1104,33 +1100,12 @@ export function generateReturnPdf(
       },
       {
         title: 'Nowe uszkodzenia (w momencie zwrotu)',
-        lines: newIssuesForDamageSection.map((photo) => {
+        lines: newIssues.map((photo) => {
           const label = POSITION_LABELS[photo.position_on_template] || photo.position_on_template;
-          return `• ${label}: ${photo.issue_description}`;
+          return `• ${label}: ${normalizeIssueText(photo.new_issue_description)}`;
         }),
       },
     ],
-  });
-  y += 12;
-
-  const summaryLines = [
-    newIssues.length > 0
-      ? `Nowe uszkodzenia: ${newIssues.map((photo) => `${POSITION_LABELS[photo.position_on_template] || photo.position_on_template} - ${photo.issue_description}`).join('; ')}`
-      : 'Nowe uszkodzenia: brak.',
-    continuedIssues.length > 0
-      ? `Istniejące uszkodzenia: ${continuedIssues.map((photo) => `${POSITION_LABELS[photo.position_on_template] || photo.position_on_template} - ${photo.issue_description}`).join('; ')}`
-      : 'Istniejące uszkodzenia: brak.',
-    resolvedIssues.length > 0
-      ? `Naprawione uszkodzenia: ${resolvedIssues.map((photo) => `${POSITION_LABELS[photo.position_on_template] || photo.position_on_template} - ${photo.issue_description}`).join('; ')}`
-      : 'Naprawione uszkodzenia: brak.',
-  ];
-  y = drawTextCard(doc, {
-    x: doc.page.margins.left,
-    y,
-    width: contentWidth,
-    title: 'Podsumowanie zwrotu',
-    lines: summaryLines,
-    minHeight: 112,
   });
   y += 12;
   y = drawSignatureSection(doc, y);
@@ -1188,16 +1163,14 @@ export function generateReturnPdf(
       const fp = path.join(UPLOADS_DIR, returnPhoto.file_path);
       drawImageOrPlaceholder(doc, fp, { x: rightX, y: startY + 12, width: imgW, height: imgH });
       if (returnPhoto.has_issue) {
-        const originalIssue = handoverIssuesByPos.get(returnPhoto.position_on_template)?.trim() || '';
-        const currentIssue = returnPhoto.issue_description?.trim() || '';
-        const isNew = !handoverIssuesByPos.has(returnPhoto.position_on_template);
-        const sameAsHandover = !isNew && originalIssue === currentIssue;
+        const hasOriginalIssue = handoverIssuesByPos.has(returnPhoto.position_on_template);
+        const hasNewIssue = Boolean(normalizeIssueText(returnPhoto.new_issue_description));
 
-        if (sameAsHandover) {
+        if (hasOriginalIssue && !hasNewIssue) {
           doc.fontSize(8).fillColor(COLORS.muted)
             .text('Brak nowych uszkodzeń', rightX, startY + imgH + 14, { width: imgW });
         } else {
-          const issueLabel = isNew ? 'NOWE USZKODZENIE' : 'USZKODZENIE';
+          const issueLabel = hasOriginalIssue ? 'USZKODZENIE' : 'NOWE USZKODZENIE';
           doc.fontSize(8).fillColor('red')
             .text(`${issueLabel}: ${returnPhoto.issue_description}`, rightX, startY + imgH + 14, { width: imgW });
         }

@@ -75,6 +75,8 @@ export interface HandoverPhoto {
   file_path: string;
   position_on_template: PhotoPosition;
   description: string;
+  has_issue: number;
+  issue_description: string;
   created_at: string;
 }
 
@@ -99,6 +101,7 @@ export interface ReturnPhoto {
   description: string;
   has_issue: number;
   issue_description: string;
+  new_issue_description: string;
   created_at: string;
 }
 

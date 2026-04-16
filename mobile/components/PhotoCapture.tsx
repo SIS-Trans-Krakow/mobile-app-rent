@@ -37,13 +37,32 @@ export default function PhotoCapture({
   position, visible, onClose, onSave, existingPhoto, showIssueFields, originalPhoto,
 }: Props) {
   const { t } = useTranslation();
+  const hasOriginalIssue = !!originalPhoto?.hasIssue;
+
+  const mergeIssueDescriptions = (baseText?: string, deltaText?: string) => {
+    const base = baseText?.trim() || '';
+    const delta = deltaText?.trim() || '';
+
+    if (!base) return delta;
+    if (!delta) return base;
+    if (base.toLowerCase() === delta.toLowerCase()) return base;
+
+    return `${base}; ${delta}`;
+  };
+
   const buildInitialState = () => {
-    const fallbackIssue = !existingPhoto && originalPhoto?.hasIssue;
+    const fallbackIssue = !existingPhoto && hasOriginalIssue;
+    const existingDelta = existingPhoto?.newIssueDescription
+      || (!hasOriginalIssue && existingPhoto?.hasIssue ? existingPhoto?.issueDescription : '')
+      || '';
+
     return {
       uri: existingPhoto?.uri || '',
       description: existingPhoto?.description || '',
-      hasIssue: existingPhoto?.hasIssue || fallbackIssue || false,
-      issueDescription: existingPhoto?.issueDescription || (fallbackIssue ? originalPhoto?.issueDescription : '') || '',
+      hasIssue: hasOriginalIssue
+        ? existingPhoto?.hasNewIssue || Boolean(existingDelta)
+        : existingPhoto?.hasIssue || fallbackIssue || false,
+      issueDescription: existingDelta,
     };
   };
 
@@ -106,12 +125,28 @@ export default function PhotoCapture({
       return;
     }
     setErrorMessage(null);
+    const currentHasIssue = showIssueFields
+      ? (hasOriginalIssue ? true : hasIssue)
+      : undefined;
+    const newIssueDescription = showIssueFields
+      ? (hasIssue ? issueDescription.trim() : '')
+      : undefined;
+    const currentIssueDescription = showIssueFields && currentHasIssue
+      ? (
+        hasOriginalIssue
+          ? mergeIssueDescriptions(originalPhoto?.issueDescription, newIssueDescription)
+          : issueDescription.trim()
+      )
+      : undefined;
+
     onSave({
       uri,
       position,
       description: description.trim(),
-      hasIssue: showIssueFields ? hasIssue : undefined,
-      issueDescription: showIssueFields && hasIssue ? issueDescription.trim() : undefined,
+      hasIssue: currentHasIssue,
+      hasNewIssue: showIssueFields ? hasIssue : undefined,
+      issueDescription: currentIssueDescription,
+      newIssueDescription,
     });
     onClose();
   };
@@ -150,9 +185,10 @@ export default function PhotoCapture({
             <Text style={styles.sectionLabel}>{t('return.original')}:</Text>
             <Image source={{ uri: originalPhoto.uri }} style={styles.originalImage} />
             {originalPhoto.hasIssue && originalPhoto.issueDescription ? (
-              <Text style={styles.originalIssueDesc}>
-                {t('return.issueDescription')}: {originalPhoto.issueDescription}
-              </Text>
+              <>
+                <Text style={styles.referenceLabel}>{t('return.existingIssueReference')}</Text>
+                <Text style={styles.originalIssueDesc}>{originalPhoto.issueDescription}</Text>
+              </>
             ) : originalPhoto.description ? (
               <Text style={styles.originalDesc}>{originalPhoto.description}</Text>
             ) : null}
@@ -204,17 +240,22 @@ export default function PhotoCapture({
         {showIssueFields && (
           <View style={styles.issueSection}>
             <View style={styles.issueToggle}>
-              <Text style={styles.issueLabel}>{t('return.issueFound')}</Text>
+              <Text style={styles.issueLabel}>
+                {hasOriginalIssue ? t('return.newIssueFound') : t('return.issueFound')}
+              </Text>
               <Switch
                 value={hasIssue}
                 onValueChange={setHasIssue}
                 trackColor={{ true: Colors.danger }}
               />
             </View>
+            {hasOriginalIssue && (
+              <Text style={styles.issueHint}>{t('return.onlyNewIssuesHint')}</Text>
+            )}
             {hasIssue && (
               <TextInput
                 style={[styles.input, styles.issueInput]}
-                placeholder={t('return.issueDescription')}
+                placeholder={hasOriginalIssue ? t('return.newIssueDescription') : t('return.issueDescription')}
                 placeholderTextColor={Colors.gray400}
                 value={issueDescription}
                 onChangeText={setIssueDescription}
@@ -272,6 +313,12 @@ const styles = StyleSheet.create({
   originalIssueDesc: {
     fontSize: FontSize.xs,
     color: Colors.danger,
+    fontWeight: '600',
+    marginTop: Spacing.xs,
+  },
+  referenceLabel: {
+    fontSize: FontSize.xs,
+    color: Colors.textSecondary,
     fontWeight: '600',
     marginTop: Spacing.xs,
   },
@@ -333,6 +380,11 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   issueLabel: { fontSize: FontSize.md, fontWeight: '600', color: Colors.danger },
+  issueHint: {
+    fontSize: FontSize.xs,
+    color: Colors.textSecondary,
+    marginTop: Spacing.xs,
+  },
   issueInput: {
     marginHorizontal: 0,
     marginTop: Spacing.sm,

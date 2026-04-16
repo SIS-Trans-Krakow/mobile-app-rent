@@ -23,6 +23,8 @@ export interface ZonePhoto {
   description: string;
   hasIssue?: boolean;
   issueDescription?: string;
+  newIssueDescription?: string;
+  hasNewIssue?: boolean;
   isPreloaded?: boolean;
   preloadedFilePath?: string;
 }

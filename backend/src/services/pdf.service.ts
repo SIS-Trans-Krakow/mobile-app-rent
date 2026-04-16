@@ -21,16 +21,16 @@ const COLORS = {
 };
 
 const POSITION_LABELS: Record<string, string> = {
-  front: 'Przód',
-  rear: 'Tył',
-  'left-side': 'Lewa strona',
-  'right-side': 'Prawa strona',
-  top: 'Góra',
-  interior: 'Wnętrze',
-  'front-left': 'Przód-lewo',
-  'front-right': 'Przód-prawo',
-  'rear-left': 'Tył-lewo',
-  'rear-right': 'Tył-prawo',
+  front: 'Przód / Front',
+  rear: 'Tył / Rear',
+  'left-side': 'Lewa strona / Left side',
+  'right-side': 'Prawa strona / Right side',
+  top: 'Góra / Top',
+  interior: 'Wnętrze / Interior',
+  'front-left': 'Przód-lewo / Front-left',
+  'front-right': 'Przód-prawo / Front-right',
+  'rear-left': 'Tył-lewo / Rear-left',
+  'rear-right': 'Tył-prawo / Rear-right',
 };
 
 const POSITION_ORDER = [
@@ -197,7 +197,7 @@ function addPageNumbers(doc: PDFKit.PDFDocument): void {
   for (let index = range.start; index < range.start + range.count; index += 1) {
     doc.switchToPage(index);
     doc.fontSize(8).fillColor(COLORS.muted).text(
-      `Strona ${index - range.start + 1} / ${totalPages}`,
+      `Strona / Page ${index - range.start + 1} / ${totalPages}`,
       doc.page.margins.left,
       doc.page.height - doc.page.margins.bottom - 12,
       {
@@ -286,7 +286,7 @@ function drawImageOrPlaceholder(
   };
 
   if (!fs.existsSync(filePath)) {
-    drawPlaceholder('Brak pliku zdjęcia');
+    drawPlaceholder('Brak pliku zdjęcia / No image file');
     return;
   }
 
@@ -303,7 +303,7 @@ function drawImageOrPlaceholder(
       doc.image(filePath, { width, height });
     }
   } catch {
-    drawPlaceholder('Nie można załadować zdjęcia');
+    drawPlaceholder('Nie można załadować zdjęcia / Cannot load image');
   }
 }
 
@@ -413,9 +413,9 @@ function drawMetaRow(doc: PDFKit.PDFDocument, y: number, data: HandoverData): nu
   }
 
   const columns = [
-    { title: 'Data wydania', value: sanitizeText(data.handover_date) },
-    { title: 'Godzina', value: sanitizeText(data.handover_time) },
-    { title: 'Przygotował', value: sanitizeText(data.created_by_name) },
+    { title: 'Data wydania / Issue date', value: sanitizeText(data.handover_date) },
+    { title: 'Godzina / Time', value: sanitizeText(data.handover_time) },
+    { title: 'Przygotował / Prepared by', value: sanitizeText(data.created_by_name) },
   ];
 
   columns.forEach((column, index) => {
@@ -445,16 +445,16 @@ function drawReturnMetaRow(doc: PDFKit.PDFDocument, y: number, returnData: Retur
   }
 
   const columns = [
-    { title: 'Numer przekazania', value: sanitizeText(handoverId) },
-    { title: 'Data zwrotu', value: sanitizeText(returnData.return_date) },
-    { title: 'Godzina', value: sanitizeText(returnData.return_time) },
-    { title: 'Przygotował', value: sanitizeText(returnData.created_by_name) },
+    { title: 'Numer przekazania / Handover No.', value: sanitizeText(handoverId) },
+    { title: 'Data zwrotu / Return date', value: sanitizeText(returnData.return_date) },
+    { title: 'Godzina / Time', value: sanitizeText(returnData.return_time) },
+    { title: 'Przygotował / Prepared by', value: sanitizeText(returnData.created_by_name) },
   ];
 
   columns.forEach((column, index) => {
     const colX = x + index * colWidth;
-    doc.fontSize(8).fillColor(COLORS.muted).text(column.title, colX + padding, y + 12, { width: colWidth - padding * 2 });
-    doc.fontSize(10).fillColor(COLORS.text).text(column.value, colX + padding, y + 28, { width: colWidth - padding * 2 });
+    doc.fontSize(8).fillColor(COLORS.muted).text(column.title, colX + padding, y + 14, { width: colWidth - padding * 2 });
+    doc.fontSize(10).fillColor(COLORS.text).text(column.value, colX + padding, y + 36, { width: colWidth - padding * 2 });
   });
 
   doc.fillColor(COLORS.text);
@@ -474,19 +474,19 @@ function drawChecklistRow(doc: PDFKit.PDFDocument, y: number, data: HandoverData
 
   const items = [
     {
-      title: 'Dokumenty',
+      title: 'Dokumenty / Documents',
       checked: Boolean(data.has_documents),
-      note: Boolean(data.has_documents) ? 'Komplet przekazano' : 'Brak przy wydaniu',
+      note: Boolean(data.has_documents) ? 'Komplet przekazano / Complete' : 'Brak przy wydaniu / Missing at issue',
     },
     {
-      title: 'Belki',
+      title: 'Belki / Beams',
       checked: data.beams_count > 0,
-      note: `${Math.max(data.beams_count, 0)} szt.`,
+      note: `${Math.max(data.beams_count, 0)} szt. / pcs.`,
     },
     {
-      title: 'Pasy',
+      title: 'Pasy / Straps',
       checked: data.straps_count > 0,
-      note: `${Math.max(data.straps_count, 0)} szt.`,
+      note: `${Math.max(data.straps_count, 0)} szt. / pcs.`,
     },
   ];
 
@@ -534,21 +534,21 @@ function drawReturnEquipmentComparisonRow(
 
   const items = [
     {
-      title: 'Dokumenty',
-      note: `Przekazanie: ${handoverData.has_documents ? 'TAK' : 'NIE'}`,
-      result: `Zwrot: ${returnData.return_has_documents ? 'TAK' : 'NIE'}`,
+      title: 'Dokumenty / Documents',
+      note: `Przekazanie / Handover: ${handoverData.has_documents ? 'TAK / YES' : 'NIE / NO'}`,
+      result: `Zwrot / Return: ${returnData.return_has_documents ? 'TAK / YES' : 'NIE / NO'}`,
       changed: Boolean(handoverData.has_documents) !== Boolean(returnData.return_has_documents),
     },
     {
-      title: 'Belki',
-      note: `Przekazanie: ${Math.max(handoverData.beams_count, 0)} szt.`,
-      result: `Zwrot: ${Math.max(returnData.return_beams_count, 0)} szt.`,
+      title: 'Belki / Beams',
+      note: `Przekazanie / Handover: ${Math.max(handoverData.beams_count, 0)} szt. / pcs.`,
+      result: `Zwrot / Return: ${Math.max(returnData.return_beams_count, 0)} szt. / pcs.`,
       changed: Math.max(handoverData.beams_count, 0) !== Math.max(returnData.return_beams_count, 0),
     },
     {
-      title: 'Pasy',
-      note: `Przekazanie: ${Math.max(handoverData.straps_count, 0)} szt.`,
-      result: `Zwrot: ${Math.max(returnData.return_straps_count, 0)} szt.`,
+      title: 'Pasy / Straps',
+      note: `Przekazanie / Handover: ${Math.max(handoverData.straps_count, 0)} szt. / pcs.`,
+      result: `Zwrot / Return: ${Math.max(returnData.return_straps_count, 0)} szt. / pcs.`,
       changed: Math.max(handoverData.straps_count, 0) !== Math.max(returnData.return_straps_count, 0),
     },
   ];
@@ -593,7 +593,7 @@ function groupIssues(photos: HandoverPhoto[]): IssueGroup[] {
       photos: [],
     };
 
-    const issueDescription = photo.issue_description?.trim() || 'Zaznaczono uszkodzenie';
+    const issueDescription = photo.issue_description?.trim() || 'Zaznaczono uszkodzenie / Damage marked';
     if (!entry.descriptions.includes(issueDescription)) {
       entry.descriptions.push(issueDescription);
     }
@@ -636,8 +636,8 @@ function drawTrailerOutline(doc: PDFKit.PDFDocument, x: number, y: number, width
     doc.circle(px(0.807), py(wheelY), width * 0.033).stroke();
   });
 
-  doc.fontSize(8).fillColor(COLORS.muted).text('PRZÓD', x, y - 16, { width, align: 'center' });
-  doc.text('TYŁ', x, y + height + 4, { width, align: 'center' });
+  doc.fontSize(8).fillColor(COLORS.muted).text('PRZÓD / FRONT', x, y - 16, { width, align: 'center' });
+  doc.text('TYŁ / REAR', x, y + height + 4, { width, align: 'center' });
   doc.restore();
   doc.fillColor(COLORS.text);
 }
@@ -662,8 +662,8 @@ function drawDamageSchema(
   y = drawSectionHeading(
     doc,
     y,
-    'Uszkodzenia naczepy',
-    options?.subtitle ?? 'Schemat oparty o strefy oznaczone przy wydaniu'
+    'Uszkodzenia naczepy / Trailer damage',
+    options?.subtitle ?? 'Schemat oparty o strefy oznaczone przy wydaniu / Schema based on zones marked at handover'
   );
 
   drawTrailerOutline(doc, diagramX, y + 10, diagramWidth, diagramHeight);
@@ -706,7 +706,7 @@ function drawDamageSchema(
   doc.save();
   doc.roundedRect(listX, y + 10, listWidth, diagramHeight, 8).fillAndStroke('white', COLORS.borderLight);
   doc.restore();
-  doc.fontSize(11).fillColor(COLORS.accent).text('Opis uszkodzeń', listX + 12, y + 22, { width: listWidth - 24 });
+  doc.fontSize(11).fillColor(COLORS.accent).text('Opis uszkodzeń / Damage description', listX + 12, y + 22, { width: listWidth - 24 });
 
   let textY = y + 44;
   if (options?.sections?.length) {
@@ -717,7 +717,7 @@ function drawDamageSchema(
       textY = doc.y + 4;
 
       if (section.lines.length === 0) {
-        doc.fontSize(8).fillColor(COLORS.muted).text('brak.', listX + 12, textY, {
+        doc.fontSize(8).fillColor(COLORS.muted).text('brak / none.', listX + 12, textY, {
           width: listWidth - 24,
         });
         textY = doc.y + 10;
@@ -736,7 +736,7 @@ function drawDamageSchema(
       }
     });
   } else if (issueGroups.length === 0) {
-    doc.fontSize(10).fillColor(COLORS.text).text(options?.emptyMessage ?? 'Brak oznaczonych uszkodzeń w chwili wydania.', listX + 12, textY, {
+    doc.fontSize(10).fillColor(COLORS.text).text(options?.emptyMessage ?? 'Brak oznaczonych uszkodzeń w chwili wydania / No damage marked at time of handover.', listX + 12, textY, {
       width: listWidth - 24,
     });
   } else {
@@ -761,9 +761,9 @@ function drawSignatureSection(doc: PDFKit.PDFDocument, y: number): number {
   const cardHeight = 96;
 
   y = ensurePageSpace(doc, y, cardHeight + 30);
-  y = drawSectionHeading(doc, y, 'Podpisy');
+  y = drawSectionHeading(doc, y, 'Podpisy / Signatures');
 
-  const titles = ['Podpis wydającego', 'Podpis przyjmującego'];
+  const titles = ['Podpis wydającego / Issuer signature', 'Podpis przyjmującego / Receiver signature'];
   titles.forEach((title, index) => {
     const cardX = x + index * (cardWidth + gap);
     doc.save();
@@ -771,7 +771,7 @@ function drawSignatureSection(doc: PDFKit.PDFDocument, y: number): number {
     doc.restore();
     doc.fontSize(10).fillColor(COLORS.text).text(title, cardX + 12, y + 12, { width: cardWidth - 24, align: 'center' });
     doc.moveTo(cardX + 18, y + 72).lineTo(cardX + cardWidth - 18, y + 72).strokeColor(COLORS.borderLight).lineWidth(1).stroke();
-    doc.fontSize(8).fillColor(COLORS.muted).text('Miejsce na podpis odręczny', cardX + 12, y + 78, {
+    doc.fontSize(8).fillColor(COLORS.muted).text('Miejsce na podpis odręczny / Space for handwritten signature', cardX + 12, y + 78, {
       width: cardWidth - 24,
       align: 'center',
     });
@@ -830,7 +830,7 @@ function drawPhotoGallery(
     });
 
     if (photo.description?.trim()) {
-      doc.fontSize(8).fillColor(COLORS.text).text(`Opis zdjęcia: ${photo.description.trim()}`, x + 12, cardY + 190, {
+      doc.fontSize(8).fillColor(COLORS.text).text(`Opis zdjęcia / Photo description: ${photo.description.trim()}`, x + 12, cardY + 190, {
         width: cardWidth - 24,
         height: 28,
       });
@@ -853,7 +853,7 @@ export function generateHandoverPdf(
   const contentWidth = getContentWidth(doc);
   const companyAddressLines = getCompanyAddressLines(data);
   const issueGroups = groupIssues(data.photos || []);
-  const titleHeight = 86;
+  const titleHeight = 84;
 
   let y = doc.page.margins.top;
 
@@ -861,11 +861,15 @@ export function generateHandoverPdf(
   doc.roundedRect(doc.page.margins.left, y, contentWidth, titleHeight, 12).fillAndStroke(COLORS.accentFill, COLORS.accent);
   doc.restore();
 
-  doc.fontSize(22).fillColor(COLORS.text).text(`Protokół wydania #${data.id}`, doc.page.margins.left + 18, y + 18, {
-    width: contentWidth - 160,
+  doc.fontSize(15).fillColor(COLORS.text).text('Protokół wydania / Handover Protocol', doc.page.margins.left + 16, y + 10, {
+    width: 320,
   });
-  doc.fontSize(9).fillColor(COLORS.muted).text('Dokument przygotowany do wydruku i podpisu odręcznego', doc.page.margins.left + 18, y + 46, {
-    width: contentWidth - 160,
+  doc.fontSize(15).fillColor(COLORS.text).text(`#${data.id}`, doc.page.margins.left + 16, y + 26, {
+    width: 300,
+    align: 'center',
+  });
+  doc.fontSize(7.5).fillColor(COLORS.muted).text('Dok. do wydruku i podpisu odręcznego / Doc. for printing & handwritten signature', doc.page.margins.left + 16, y + 42, {
+    width: 320,
   });
   y += titleHeight + 12;
 
@@ -873,17 +877,17 @@ export function generateHandoverPdf(
     x: doc.page.margins.left,
     y,
     width: contentWidth,
-    title: 'Dane naczepy',
+    title: 'Dane naczepy / Trailer data',
     items: [
-      { label: 'Numer rejestracyjny', value: sanitizeText(data.registration_number) },
-      { label: 'VIN / numer nadwozia', value: sanitizeText(data.vin) },
-      { label: 'Rok produkcji', value: extractProductionYear(data.production_date || '') },
-      { label: 'Typ naczepy', value: sanitizeText(data.trailer_type) },
+      { label: 'Numer rejestracyjny / Registration No.', value: sanitizeText(data.registration_number) },
+      { label: 'VIN', value: sanitizeText(data.vin) },
+      { label: 'Rok produkcji / Production year', value: extractProductionYear(data.production_date || '') },
+      { label: 'Typ naczepy / Trailer type', value: sanitizeText(data.trailer_type) },
     ],
   });
 
   y += 12;
-  y = drawSectionHeading(doc, y, 'Strony');
+  y = drawSectionHeading(doc, y, 'Strony / Parties');
 
   const gap = 16;
   const cardWidth = (contentWidth - gap) / 2;
@@ -891,7 +895,7 @@ export function generateHandoverPdf(
     `${sanitizeText(issuerCompany.name)}`,
     `${sanitizeText(issuerCompany.address)}`,
     `NIP: ${sanitizeText(issuerCompany.tax_id)}`,
-    `Telefon: ${sanitizeText(issuerCompany.phone)}`,
+    `Telefon / Phone: ${sanitizeText(issuerCompany.phone)}`,
     `E-mail: ${sanitizeText(issuerCompany.email)}`,
   ];
   const clientLines = [`${sanitizeText(data.company_name)}`];
@@ -901,23 +905,23 @@ export function generateHandoverPdf(
       clientLines.push(sanitizeText(line));
     });
   } else {
-    clientLines.push('Adres: -');
+    clientLines.push('Adres / Address: -');
   }
   clientLines.push(`NIP: ${sanitizeText(data.company_tax_id)}`);
-  clientLines.push(`Telefon: ${sanitizeText(data.company_phone)}`);
+  clientLines.push(`Telefon / Phone: ${sanitizeText(data.company_phone)}`);
   clientLines.push(`E-mail: ${sanitizeText(data.company_email)}`);
-  clientLines.push(`Osoba kontaktowa: ${sanitizeText(data.company_contact)}`);
+  clientLines.push(`Osoba kontaktowa / Contact person: ${sanitizeText(data.company_contact)}`);
 
   doc.fontSize(9);
   const issuerMinHeight = 146;
   const clientMinHeight = 146;
   y = ensurePageSpace(doc, y, Math.max(issuerMinHeight, clientMinHeight));
-  drawTextCard(doc, { x: doc.page.margins.left, y, width: cardWidth, title: 'Wydający', lines: issuerLines, minHeight: issuerMinHeight });
+  drawTextCard(doc, { x: doc.page.margins.left, y, width: cardWidth, title: 'Wydający / Issuer', lines: issuerLines, minHeight: issuerMinHeight });
   const participantsBottom = drawTextCard(doc, {
     x: doc.page.margins.left + cardWidth + gap,
     y,
     width: cardWidth,
-    title: 'Przyjmujący',
+    title: 'Przyjmujący / Receiver',
     lines: clientLines,
     minHeight: clientMinHeight,
   });
@@ -934,7 +938,7 @@ export function generateHandoverPdf(
       x: doc.page.margins.left,
       y,
       width: contentWidth,
-      title: 'Uwagi',
+      title: 'Uwagi / Notes',
       lines: [data.equipment_notes.trim()],
       minHeight: 72,
     });
@@ -955,12 +959,12 @@ export function generateHandoverPdf(
   }
 
   drawPhotoGallery(doc, y, data.photos || [], {
-    title: 'Zdjęcia z momentu wydania',
-    subtitle: 'Pełna dokumentacja fotograficzna wykonana przy przekazaniu',
+    title: 'Zdjęcia z momentu wydania / Photos at handover',
+    subtitle: 'Pełna dokumentacja fotograficzna wykonana przy przekazaniu / Full photographic documentation taken at handover',
     statusLine: (photo) => (
       photo.has_issue
-        ? `Uszkodzenie: ${photo.issue_description || 'Zaznaczono uszkodzenie'}`
-        : 'Stan zdjęcia: bez oznaczonego uszkodzenia'
+        ? `Uszkodzenie / Damage: ${photo.issue_description || 'Zaznaczono uszkodzenie / Damage marked'}`
+        : 'Stan zdjęcia: bez oznaczonego uszkodzenia / Photo status: no damage marked'
     ),
   });
 
@@ -977,7 +981,7 @@ export function generateReturnPdf(
   const contentWidth = getContentWidth(doc);
   const companyAddressLines = getCompanyAddressLines(handoverData);
   const currentIssueGroups = groupIssues(returnData.photos || []);
-  const titleHeight = 86;
+  const titleHeight = 84;
 
   let y = doc.page.margins.top;
 
@@ -985,18 +989,33 @@ export function generateReturnPdf(
   doc.roundedRect(doc.page.margins.left, y, contentWidth, titleHeight, 12).fillAndStroke(COLORS.accentFill, COLORS.accent);
   doc.restore();
 
-  doc.fontSize(22).fillColor(COLORS.text).text(`Protokół zwrotu #${returnData.id}`, doc.page.margins.left + 18, y + 18, {
-    width: contentWidth - 160,
+  doc.fontSize(15).fillColor(COLORS.text).text(`Protokół zwrotu / Return Protocol`, doc.page.margins.left + 16, y + 10, {
+    width: 320,
   });
-  doc.fontSize(9).fillColor(COLORS.muted).text('Dokument przygotowany do wydruku i potwierdzenia zwrotu', doc.page.margins.left + 18, y + 46, {
-    width: contentWidth - 160,
+  doc.fontSize(15).fillColor(COLORS.text).text(`#${returnData.id}`, doc.page.margins.left + 16, y + 26, {
+    width: 300,
+    align: 'center',
   });
-  doc.fontSize(9).fillColor(COLORS.text).text(`Nr przekazania: ${handoverData.id}`, doc.page.margins.left + contentWidth - 138, y + 22, {
-    width: 120,
+  doc.fontSize(7.5).fillColor(COLORS.muted).text('Dok. do wydruku i potwierdzenia zwrotu / Doc. for printing & return confirmation', doc.page.margins.left + 16, y + 42, {
+    width: 320,
+  });
+
+  const rightColX = doc.page.margins.left + 320;
+  const rightColW = contentWidth - 320 - 16;
+  doc.fontSize(7.5).fillColor(COLORS.muted).text(`Nr przekazania / Handover No.`, rightColX, y + 12, {
+    width: rightColW,
     align: 'right',
   });
-  doc.text(`Data zwrotu: ${sanitizeText(returnData.return_date)}`, doc.page.margins.left + contentWidth - 138, y + 38, {
-    width: 120,
+  doc.fontSize(10).fillColor(COLORS.text).text(`#${handoverData.id}`, rightColX, y + 22, {
+    width: rightColW,
+    align: 'right',
+  });
+  doc.fontSize(7.5).fillColor(COLORS.muted).text(`Data zwrotu / Return date`, rightColX, y + 38, {
+    width: rightColW,
+    align: 'right',
+  });
+  doc.fontSize(10).fillColor(COLORS.text).text(sanitizeText(returnData.return_date), rightColX, y + 48, {
+    width: rightColW,
     align: 'right',
   });
 
@@ -1006,17 +1025,17 @@ export function generateReturnPdf(
     x: doc.page.margins.left,
     y,
     width: contentWidth,
-    title: 'Dane naczepy',
+    title: 'Dane naczepy / Trailer data',
     items: [
-      { label: 'Numer rejestracyjny', value: sanitizeText(handoverData.registration_number) },
+      { label: 'Numer rejestracyjny / Registration No.', value: sanitizeText(handoverData.registration_number) },
       { label: 'VIN', value: sanitizeText(handoverData.vin) },
-      { label: 'Rok produkcji', value: extractProductionYear(handoverData.production_date || '') },
-      { label: 'Typ naczepy', value: sanitizeText(handoverData.trailer_type) },
+      { label: 'Rok produkcji / Production year', value: extractProductionYear(handoverData.production_date || '') },
+      { label: 'Typ naczepy / Trailer type', value: sanitizeText(handoverData.trailer_type) },
     ],
   });
 
   y += 12;
-  y = drawSectionHeading(doc, y, 'Strony');
+  y = drawSectionHeading(doc, y, 'Strony / Parties');
 
   const gap = 16;
   const cardWidth = (contentWidth - gap) / 2;
@@ -1024,7 +1043,7 @@ export function generateReturnPdf(
     `${sanitizeText(issuerCompany.name)}`,
     `${sanitizeText(issuerCompany.address)}`,
     `NIP: ${sanitizeText(issuerCompany.tax_id)}`,
-    `Telefon: ${sanitizeText(issuerCompany.phone)}`,
+    `Telefon / Phone: ${sanitizeText(issuerCompany.phone)}`,
     `E-mail: ${sanitizeText(issuerCompany.email)}`,
   ];
   const clientLines = [`${sanitizeText(handoverData.company_name)}`];
@@ -1034,23 +1053,23 @@ export function generateReturnPdf(
       clientLines.push(sanitizeText(line));
     });
   } else {
-    clientLines.push('-');
+    clientLines.push('Adres / Address: -');
   }
   clientLines.push(`NIP: ${sanitizeText(handoverData.company_tax_id)}`);
-  clientLines.push(`Telefon: ${sanitizeText(handoverData.company_phone)}`);
+  clientLines.push(`Telefon / Phone: ${sanitizeText(handoverData.company_phone)}`);
   clientLines.push(`E-mail: ${sanitizeText(handoverData.company_email)}`);
-  clientLines.push(`Osoba kontaktowa: ${sanitizeText(handoverData.company_contact)}`);
+  clientLines.push(`Osoba kontaktowa / Contact person: ${sanitizeText(handoverData.company_contact)}`);
 
   doc.fontSize(9);
   const issuerMinHeight = 146;
   const clientMinHeight = 146;
   y = ensurePageSpace(doc, y, Math.max(issuerMinHeight, clientMinHeight));
-  drawTextCard(doc, { x: doc.page.margins.left, y, width: cardWidth, title: 'Przyjmujący', lines: issuerLines, minHeight: issuerMinHeight });
+  drawTextCard(doc, { x: doc.page.margins.left, y, width: cardWidth, title: 'Przyjmujący / Receiver', lines: issuerLines, minHeight: issuerMinHeight });
   const participantsBottom = drawTextCard(doc, {
     x: doc.page.margins.left + cardWidth + gap,
     y,
     width: cardWidth,
-    title: 'Zwracający',
+    title: 'Zwracający / Returner',
     lines: clientLines,
     minHeight: clientMinHeight,
   });
@@ -1067,7 +1086,7 @@ export function generateReturnPdf(
       x: doc.page.margins.left,
       y,
       width: contentWidth,
-      title: 'Uwagi do zwrotu',
+      title: 'Uwagi do zwrotu / Return notes',
       lines: [returnData.notes.trim()],
       minHeight: 72,
     });
@@ -1088,10 +1107,10 @@ export function generateReturnPdf(
   doc.addPage();
   y = doc.page.margins.top;
   y = drawDamageSchema(doc, y, currentIssueGroups, {
-    subtitle: 'Schemat oparty o strefy oznaczone przy zwrocie',
+    subtitle: 'Schemat oparty o strefy oznaczone przy zwrocie / Schema based on zones marked at return\n',
     sections: [
       {
-        title: 'Istniejące uszkodzenia (z przekazania)',
+        title: 'Istniejące uszkodzenia (z przekazania) / Existing damage (from handover)',
         lines: continuedIssues.map((photo) => {
           const label = POSITION_LABELS[photo.position_on_template] || photo.position_on_template;
           const originalIssue = handoverIssuesByPos.get(photo.position_on_template) || photo.issue_description;
@@ -1099,7 +1118,7 @@ export function generateReturnPdf(
         }),
       },
       {
-        title: 'Nowe uszkodzenia (w momencie zwrotu)',
+        title: 'Nowe uszkodzenia (w momencie zwrotu) / New damage (at time of return)',
         lines: newIssues.map((photo) => {
           const label = POSITION_LABELS[photo.position_on_template] || photo.position_on_template;
           return `• ${label}: ${normalizeIssueText(photo.new_issue_description)}`;
@@ -1117,10 +1136,10 @@ export function generateReturnPdf(
 
   if (allPositions.size > 0) {
     doc.addPage();
-    doc.fontSize(14).fillColor(COLORS.accent).text('Porównanie fotograficzne', doc.page.margins.left, doc.page.margins.top, {
+    doc.fontSize(14).fillColor(COLORS.accent).text('Porównanie fotograficzne / Photo comparison', doc.page.margins.left, doc.page.margins.top, {
       width: contentWidth,
     });
-    doc.fontSize(8).fillColor(COLORS.muted).text('Zestawienie zdjęć z przekazania i zwrotu dla tych samych stref', doc.page.margins.left, doc.y + 2, {
+    doc.fontSize(8).fillColor(COLORS.muted).text('Zestawienie zdjęć z przekazania i zwrotu dla tych samych stref / Comparison of handover and return photos for the same zones', doc.page.margins.left, doc.y + 2, {
       width: contentWidth,
     });
     doc.fillColor(COLORS.text);
@@ -1134,7 +1153,7 @@ export function generateReturnPdf(
 
     if (doc.y > 500) doc.addPage();
 
-    doc.fontSize(11).text(`Pozycja: ${label}`, { underline: true });
+    doc.fontSize(11).text(`Pozycja / Position: ${label}`, doc.page.margins.left, doc.y, { underline: true });
     doc.moveDown(0.3);
 
     const leftX = 40;
@@ -1143,22 +1162,22 @@ export function generateReturnPdf(
     const imgH = 160;
     const startY = doc.y;
 
-    doc.fontSize(8).text('PRZEKAZANIE:', leftX, startY);
+    doc.fontSize(8).text('PRZEKAZANIE / HANDOVER:', leftX, startY);
     if (handoverPhoto) {
       const fp = path.join(getUploadsDir(), handoverPhoto.file_path);
       drawImageOrPlaceholder(doc, fp, { x: leftX, y: startY + 12, width: imgW, height: imgH });
       if (handoverPhoto.has_issue) {
         doc.fontSize(8).fillColor('#b45309')
-          .text(`USZKODZENIE: ${handoverPhoto.issue_description}`, leftX, startY + imgH + 14, { width: imgW });
+          .text(`USZKODZENIE / DAMAGE: ${handoverPhoto.issue_description}`, leftX, startY + imgH + 14, { width: imgW });
         doc.fillColor('black');
       } else if (handoverPhoto.description) {
         doc.fontSize(7).text(handoverPhoto.description, leftX, startY + imgH + 14, { width: imgW });
       }
     } else {
-      doc.fontSize(8).text('Brak zdjęcia', leftX, startY + 12);
+      doc.fontSize(8).text('Brak zdjęcia / No photo', leftX, startY + 12);
     }
 
-    doc.fontSize(8).text('ZWROT:', rightX, startY);
+    doc.fontSize(8).text('ZWROT / RETURN:', rightX, startY);
     if (returnPhoto) {
       const fp = path.join(getUploadsDir(), returnPhoto.file_path);
       drawImageOrPlaceholder(doc, fp, { x: rightX, y: startY + 12, width: imgW, height: imgH });
@@ -1168,9 +1187,9 @@ export function generateReturnPdf(
 
         if (hasOriginalIssue && !hasNewIssue) {
           doc.fontSize(8).fillColor(COLORS.muted)
-            .text('Brak nowych uszkodzeń', rightX, startY + imgH + 14, { width: imgW });
+            .text('Brak nowych uszkodzeń / No new damage', rightX, startY + imgH + 14, { width: imgW });
         } else {
-          const issueLabel = hasOriginalIssue ? 'USZKODZENIE' : 'NOWE USZKODZENIE';
+          const issueLabel = hasOriginalIssue ? 'USZKODZENIE / DAMAGE' : 'NOWE USZKODZENIE / NEW DAMAGE';
           doc.fontSize(8).fillColor('red')
             .text(`${issueLabel}: ${returnPhoto.issue_description}`, rightX, startY + imgH + 14, { width: imgW });
         }
@@ -1179,7 +1198,7 @@ export function generateReturnPdf(
         doc.fontSize(7).text(returnPhoto.description, rightX, startY + imgH + 14, { width: imgW });
       }
     } else {
-      doc.fontSize(8).text('Brak zdjęcia', rightX, startY + 12);
+      doc.fontSize(8).text('Brak zdjęcia / No photo', rightX, startY + 12);
     }
 
     doc.y = startY + imgH + 40;

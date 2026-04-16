@@ -1,6 +1,8 @@
 import { Tabs, Redirect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
+import { Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../stores/auth';
 import { Colors } from '../../constants/theme';
 import { webConstrainedWidthStyle } from '../../constants/layout';
@@ -8,7 +10,10 @@ import { webConstrainedWidthStyle } from '../../constants/layout';
 export default function AppLayout() {
   const { t } = useTranslation();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { isAuthenticated, isLoading, user } = useAuthStore();
+  const tabBarBaseHeight = Platform.OS === 'web' ? 64 : 56;
+  const tabBarBottomPadding = Platform.OS === 'web' ? 8 : Math.max(insets.bottom, 6);
 
   if (isLoading) return null;
   if (!isAuthenticated) return <Redirect href="/(auth)/login" />;
@@ -22,8 +27,9 @@ export default function AppLayout() {
           backgroundColor: Colors.white,
           borderTopColor: Colors.border,
           borderTopWidth: 0.5,
-          paddingBottom: 4,
-          height: 52,
+          paddingTop: 6,
+          paddingBottom: tabBarBottomPadding,
+          height: tabBarBaseHeight + (Platform.OS === 'web' ? 0 : insets.bottom),
           ...webConstrainedWidthStyle,
         },
         tabBarLabelStyle: { fontSize: 11, fontWeight: '500' },

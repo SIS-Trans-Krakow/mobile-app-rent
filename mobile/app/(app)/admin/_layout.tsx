@@ -16,6 +16,7 @@ export default function AdminLayout() {
       }}
     >
       <Stack.Screen name="index" options={{ title: t('nav.admin') }} />
+      <Stack.Screen name="companies" options={{ title: t('admin.clients') }} />
       <Stack.Screen name="company-profile" options={{ title: t('admin.companyProfile') }} />
       <Stack.Screen name="users" options={{ title: t('admin.users') }} />
       <Stack.Screen name="trailers" options={{ title: t('admin.trailers') }} />

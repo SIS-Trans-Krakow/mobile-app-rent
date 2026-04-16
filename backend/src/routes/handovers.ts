@@ -6,16 +6,63 @@ import { v4 as uuidv4 } from 'uuid';
 import { getDb } from '../database/schema';
 import { authenticate, requireAdmin } from '../middleware/auth';
 import { convertToPdfCompatibleJpeg } from '../utils/image';
+import {
+  getCompanyCatalogRecord,
+  getCompanySnapshotFromBody,
+  getIssuerSnapshot,
+  getPreparedByName,
+  normalizeText,
+  upsertCompanyCatalogRecord,
+} from '../utils/documentSnapshots';
+import { getUploadsDir } from '../utils/paths';
 
 const router = Router();
 router.use(authenticate);
 
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png']);
-const ALLOWED_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png']);
 const REQUIRED_HANDOVER_POSITIONS = ['front', 'rear', 'left-side', 'right-side'];
+const toArray = (v: any) => Array.isArray(v) ? v : v ? [v] : [];
+
+function toOptionalId(value: unknown): number | null {
+  const normalized = normalizeText(value);
+  if (!normalized) return null;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function toBooleanFlag(value: unknown): boolean {
+  return value === '1' || value === 'true' || value === true;
+}
+
+function getHandoverSelectSql(whereClause = ''): string {
+  return `
+    SELECT h.*,
+           h.prepared_by_name AS created_by_name,
+           t.registration_number,
+           t.vin,
+           t.brand,
+           t.type AS trailer_type,
+           t.production_date,
+           (
+             SELECT COUNT(*)
+             FROM handover_photos hp
+             WHERE hp.handover_id = h.id AND hp.has_issue = 1
+           ) AS issue_count
+    FROM handovers h
+    JOIN trailers t ON h.trailer_id = t.id
+    ${whereClause}
+  `;
+}
+
+function ensureExistingCompanyId(companyId: number | null): number | null {
+  if (!companyId) return null;
+  const db = getDb();
+  const company = getCompanyCatalogRecord(db, companyId);
+  return company ? companyId : null;
+}
 
 const storage = multer.diskStorage({
-  destination: path.join(__dirname, '..', '..', 'uploads'),
+  destination: getUploadsDir(),
   filename: (_req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
     cb(null, `${uuidv4()}${ext}`);
@@ -36,19 +83,7 @@ const upload = multer({
 router.get('/', (req: Request, res: Response) => {
   const db = getDb();
   const { status } = req.query;
-  let query = `
-    SELECT h.*, c.name as company_name, t.registration_number, t.type as trailer_type,
-           t.production_date, u.full_name as created_by_name,
-           (
-             SELECT COUNT(*)
-             FROM handover_photos hp
-             WHERE hp.handover_id = h.id AND hp.has_issue = 1
-           ) as issue_count
-    FROM handovers h
-    JOIN companies c ON h.company_id = c.id
-    JOIN trailers t ON h.trailer_id = t.id
-    JOIN users u ON h.created_by = u.id
-  `;
+  let query = getHandoverSelectSql();
   const params: any[] = [];
   if (status) {
     query += ' WHERE h.status = ?';
@@ -61,21 +96,7 @@ router.get('/', (req: Request, res: Response) => {
 
 router.get('/:id', (req: Request, res: Response) => {
   const db = getDb();
-  const handover = db.prepare(`
-    SELECT h.*, c.name as company_name,
-           COALESCE(NULLIF(c.address_line1, ''), c.address) as company_address_line1,
-           c.address_line2 as company_address_line2,
-           c.postal_code as company_postal_code,
-           c.tax_id as company_tax_id,
-           c.phone as company_phone, c.email as company_email, c.contact_person as company_contact,
-           t.registration_number, t.vin, t.brand, t.type as trailer_type,
-           t.production_date, u.full_name as created_by_name
-    FROM handovers h
-    JOIN companies c ON h.company_id = c.id
-    JOIN trailers t ON h.trailer_id = t.id
-    JOIN users u ON h.created_by = u.id
-    WHERE h.id = ?
-  `).get(Number(req.params.id));
+  const handover = db.prepare(`${getHandoverSelectSql('WHERE h.id = ?')}`).get(Number(req.params.id));
 
   if (!handover) {
     res.status(404).json({ error: 'Handover not found' });
@@ -87,7 +108,9 @@ router.get('/:id', (req: Request, res: Response) => {
   ).all(Number(req.params.id));
 
   const returnRecord = db.prepare(
-    'SELECT r.*, u.full_name as created_by_name FROM returns r JOIN users u ON r.created_by = u.id WHERE r.handover_id = ?'
+    `SELECT r.*, r.prepared_by_name AS created_by_name
+     FROM returns r
+     WHERE r.handover_id = ?`
   ).get(Number(req.params.id)) as any | undefined;
 
   let returnPhotos: any[] = [];
@@ -108,9 +131,8 @@ router.post('/', upload.array('photos', 20), async (req: Request, res: Response)
   try {
     const db = getDb();
     const {
-      company_name, company_address_line1, company_address_line2, company_postal_code,
-      company_tax_id, company_phone, company_email, company_contact,
       company_id: existingCompanyId,
+      save_company_to_db,
       registration_number, vin, brand, trailer_type, production_date,
       trailer_id: existingTrailerId,
       handover_date, handover_time, equipment_notes,
@@ -121,110 +143,23 @@ router.post('/', upload.array('photos', 20), async (req: Request, res: Response)
       inherited_photo_has_issues, inherited_photo_issue_descriptions,
     } = req.body;
 
-    const normalizedCompanyName = (company_name || '').trim();
-    const normalizedCompanyContact = (company_contact || '').trim();
-    const normalizedCompanyAddressLine1 = (company_address_line1 || '').trim();
-    const normalizedCompanyAddressLine2 = (company_address_line2 || '').trim();
-    const normalizedCompanyPostalCode = (company_postal_code || '').trim();
-    const normalizedCompanyTaxId = (company_tax_id || '').trim();
-    const legacyCompanyAddress = [
-      normalizedCompanyAddressLine1,
-      normalizedCompanyAddressLine2,
-      normalizedCompanyPostalCode,
-    ].filter(Boolean).join(', ');
-    const normalizedRegistration = (registration_number || '').trim();
+    const companySnapshot = getCompanySnapshotFromBody(req.body);
+    const selectedCompanyId = ensureExistingCompanyId(toOptionalId(existingCompanyId));
+    const shouldSaveCompanyToDb = toBooleanFlag(save_company_to_db);
+    const normalizedRegistration = normalizeText(registration_number);
 
-    let companyId = existingCompanyId ? Number(existingCompanyId) : null;
-    if (!companyId) {
-      let matchedCompany:
-        | {
-            id: number;
-            address: string;
-            address_line1: string;
-            address_line2: string;
-            postal_code: string;
-            tax_id: string;
-            phone: string;
-            email: string;
-            contact_person: string;
-          }
-        | undefined;
-
-      if (!normalizedCompanyName) {
-        res.status(400).json({ error: 'Company name is required' });
-        return;
-      }
-
-      const companies = db.prepare(
-        `SELECT id, address, address_line1, address_line2, postal_code, tax_id, phone, email, contact_person
-         FROM companies
-         WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))
-         ORDER BY id DESC`
-      ).all(normalizedCompanyName) as Array<{
-        id: number;
-        address: string;
-        address_line1: string;
-        address_line2: string;
-        postal_code: string;
-        tax_id: string;
-        phone: string;
-        email: string;
-        contact_person: string;
-      }>;
-
-      if (companies.length > 0) {
-        if (!normalizedCompanyContact) {
-          matchedCompany = companies[0];
-        } else {
-          const exactContactMatch = companies.find(
-            (company) => (company.contact_person || '').trim().toLowerCase() === normalizedCompanyContact.toLowerCase()
-          );
-          matchedCompany = exactContactMatch || companies[0];
-        }
-
-        companyId = matchedCompany.id;
-
-        db.prepare(`
-          UPDATE companies
-          SET address = ?,
-              address_line1 = ?,
-              address_line2 = ?,
-              postal_code = ?,
-              tax_id = ?,
-              phone = ?,
-              email = ?,
-              contact_person = ?
-          WHERE id = ?
-        `).run(
-          legacyCompanyAddress || matchedCompany.address || '',
-          normalizedCompanyAddressLine1 || matchedCompany.address_line1 || matchedCompany.address || '',
-          normalizedCompanyAddressLine2 || matchedCompany.address_line2 || '',
-          normalizedCompanyPostalCode || matchedCompany.postal_code || '',
-          normalizedCompanyTaxId || matchedCompany.tax_id || '',
-          (company_phone || '').trim() || matchedCompany.phone || '',
-          (company_email || '').trim() || matchedCompany.email || '',
-          normalizedCompanyContact || matchedCompany.contact_person || '',
-          companyId
-        );
-      } else {
-        const result = db.prepare(
-          `INSERT INTO companies (
-            name, address, address_line1, address_line2, postal_code, tax_id, phone, email, contact_person
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-        ).run(
-          normalizedCompanyName,
-          legacyCompanyAddress,
-          normalizedCompanyAddressLine1,
-          normalizedCompanyAddressLine2,
-          normalizedCompanyPostalCode,
-          normalizedCompanyTaxId,
-          (company_phone || '').trim(),
-          (company_email || '').trim(),
-          normalizedCompanyContact
-        );
-        companyId = Number(result.lastInsertRowid);
-      }
+    if (!companySnapshot.company_name) {
+      res.status(400).json({ error: 'Company name is required' });
+      return;
     }
+
+    let companyId = selectedCompanyId;
+    if (shouldSaveCompanyToDb) {
+      companyId = upsertCompanyCatalogRecord(db, companySnapshot, selectedCompanyId);
+    }
+
+    const issuerSnapshot = getIssuerSnapshot(db);
+    const preparedByName = getPreparedByName(db, req.user!.userId);
 
     let trailerId = existingTrailerId ? Number(existingTrailerId) : null;
     if (!trailerId) {
@@ -266,18 +201,40 @@ router.post('/', upload.array('photos', 20), async (req: Request, res: Response)
     }
 
     const handoverResult = db.prepare(`
-      INSERT INTO handovers (company_id, trailer_id, created_by, handover_date, handover_time, equipment_notes, has_documents, beams_count, straps_count)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO handovers (
+        company_id, trailer_id, created_by,
+        company_name, company_address_line1, company_address_line2, company_postal_code,
+        company_tax_id, company_phone, company_email, company_contact,
+        issuer_name, issuer_address, issuer_tax_id, issuer_phone, issuer_email, prepared_by_name,
+        handover_date, handover_time, equipment_notes, has_documents, beams_count, straps_count
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      companyId, trailerId, req.user!.userId,
-      handover_date, handover_time, equipment_notes || '',
+      companyId,
+      trailerId,
+      req.user!.userId,
+      companySnapshot.company_name,
+      companySnapshot.company_address_line1,
+      companySnapshot.company_address_line2,
+      companySnapshot.company_postal_code,
+      companySnapshot.company_tax_id,
+      companySnapshot.company_phone,
+      companySnapshot.company_email,
+      companySnapshot.company_contact,
+      issuerSnapshot.issuer_name,
+      issuerSnapshot.issuer_address,
+      issuerSnapshot.issuer_tax_id,
+      issuerSnapshot.issuer_phone,
+      issuerSnapshot.issuer_email,
+      preparedByName,
+      handover_date,
+      handover_time,
+      equipment_notes || '',
       has_documents === '1' || has_documents === 'true' ? 1 : 0,
       Number(beams_count) || 0,
       Number(straps_count) || 0,
     );
     const handoverId = Number(handoverResult.lastInsertRowid);
-
-    const toArray = (v: any) => Array.isArray(v) ? v : v ? [v] : [];
 
     const files = (req.files as Express.Multer.File[]) || [];
     const positions = toArray(photo_positions);
@@ -285,7 +242,7 @@ router.post('/', upload.array('photos', 20), async (req: Request, res: Response)
     const hasIssues = toArray(photo_has_issues);
     const issueDescs = toArray(photo_issue_descriptions);
 
-    const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads');
+    const UPLOADS_DIR = getUploadsDir();
     await Promise.all(files.map(f => convertToPdfCompatibleJpeg(path.join(UPLOADS_DIR, f.filename))));
 
     const insertPhoto = db.prepare(
@@ -376,6 +333,268 @@ router.post('/', upload.array('photos', 20), async (req: Request, res: Response)
   }
 });
 
+router.patch('/:id', requireAdmin, upload.array('photos', 20), async (req: Request, res: Response) => {
+  try {
+    const db = getDb();
+    const handoverId = Number(req.params.id);
+    if (!Number.isFinite(handoverId)) {
+      res.status(400).json({ error: 'Invalid handover id' });
+      return;
+    }
+
+    const existingHandover = db.prepare(`
+      SELECT id, company_id, trailer_id, status
+      FROM handovers
+      WHERE id = ?
+    `).get(handoverId) as
+      | { id: number; company_id: number | null; trailer_id: number; status: 'active' | 'returned' }
+      | undefined;
+
+    if (!existingHandover) {
+      res.status(404).json({ error: 'Handover not found' });
+      return;
+    }
+
+    const {
+      company_id: existingCompanyId,
+      save_company_to_db,
+      registration_number, vin, brand, trailer_type, production_date,
+      trailer_id: existingTrailerId,
+      handover_date, handover_time, equipment_notes,
+      has_documents, beams_count, straps_count,
+      photo_positions, photo_descriptions,
+      photo_has_issues, photo_issue_descriptions,
+      inherited_photo_filenames, inherited_photo_positions, inherited_photo_descriptions,
+      inherited_photo_has_issues, inherited_photo_issue_descriptions,
+    } = req.body;
+
+    const companySnapshot = getCompanySnapshotFromBody(req.body);
+    const selectedCompanyId = ensureExistingCompanyId(toOptionalId(existingCompanyId));
+    const shouldSaveCompanyToDb = toBooleanFlag(save_company_to_db);
+    const normalizedRegistration = normalizeText(registration_number);
+
+    if (!companySnapshot.company_name) {
+      res.status(400).json({ error: 'Company name is required' });
+      return;
+    }
+
+    let companyId = selectedCompanyId;
+    if (shouldSaveCompanyToDb) {
+      companyId = upsertCompanyCatalogRecord(db, companySnapshot, selectedCompanyId);
+    }
+
+    const issuerSnapshot = getIssuerSnapshot(db);
+    const preparedByName = getPreparedByName(db, req.user!.userId);
+
+    let trailerId = existingTrailerId ? Number(existingTrailerId) : null;
+    if (!trailerId) {
+      if (!normalizedRegistration || !trailer_type) {
+        res.status(400).json({ error: 'Registration number and trailer type are required' });
+        return;
+      }
+
+      const existingTrailer = db.prepare(
+        `SELECT id
+         FROM trailers
+         WHERE UPPER(TRIM(registration_number)) = UPPER(TRIM(?))
+         LIMIT 1`
+      ).get(normalizedRegistration) as { id: number } | undefined;
+
+      if (existingTrailer) {
+        trailerId = existingTrailer.id;
+      } else {
+        const result = db.prepare(
+          'INSERT INTO trailers (registration_number, vin, brand, type, production_date) VALUES (?, ?, ?, ?, ?)'
+        ).run(normalizedRegistration, vin || '', brand || '', trailer_type, production_date || '');
+        trailerId = Number(result.lastInsertRowid);
+      }
+    }
+
+    if (existingHandover.status === 'active') {
+      const activeHandover = db.prepare(
+        `SELECT h.id, t.registration_number
+         FROM handovers h
+         JOIN trailers t ON t.id = h.trailer_id
+         WHERE h.trailer_id = ? AND h.status = 'active' AND h.id != ?
+         LIMIT 1`
+      ).get(trailerId, handoverId) as { id: number; registration_number: string } | undefined;
+
+      if (activeHandover) {
+        res.status(409).json({
+          error: `Trailer ${activeHandover.registration_number} is already handed over and must be returned first`,
+        });
+        return;
+      }
+    }
+
+    const files = (req.files as Express.Multer.File[]) || [];
+    const positions = toArray(photo_positions);
+    const descriptions = toArray(photo_descriptions);
+    const hasIssues = toArray(photo_has_issues);
+    const issueDescs = toArray(photo_issue_descriptions);
+    const inhFilenames = toArray(inherited_photo_filenames);
+    const inhPositions = toArray(inherited_photo_positions);
+    const inhDescriptions = toArray(inherited_photo_descriptions);
+    const inhHasIssues = toArray(inherited_photo_has_issues);
+    const inhIssueDescs = toArray(inherited_photo_issue_descriptions);
+
+    const submittedPositions = new Set<string>();
+    for (let i = 0; i < files.length; i++) {
+      submittedPositions.add((positions[i] || 'front').toString().trim());
+    }
+    for (let i = 0; i < inhFilenames.length; i++) {
+      submittedPositions.add((inhPositions[i] || 'front').toString().trim());
+    }
+
+    const missingRequiredPositions = REQUIRED_HANDOVER_POSITIONS.filter(
+      (position) => !submittedPositions.has(position)
+    );
+    if (missingRequiredPositions.length > 0) {
+      res.status(400).json({
+        error: 'Missing required handover photos',
+        missing_positions: missingRequiredPositions,
+      });
+      return;
+    }
+
+    for (let i = 0; i < files.length; i++) {
+      const hasIssue = hasIssues[i] === '1' || hasIssues[i] === 'true';
+      if (hasIssue && !String(issueDescs[i] || '').trim()) {
+        res.status(400).json({
+          error: 'Issue description is required when issue is marked',
+          position: positions[i] || 'front',
+        });
+        return;
+      }
+    }
+
+    for (let i = 0; i < inhFilenames.length; i++) {
+      const hasIssue = inhHasIssues[i] === '1' || inhHasIssues[i] === 'true';
+      if (hasIssue && !String(inhIssueDescs[i] || '').trim()) {
+        res.status(400).json({
+          error: 'Issue description is required when issue is marked',
+          position: inhPositions[i] || 'front',
+        });
+        return;
+      }
+    }
+
+    const UPLOADS_DIR = getUploadsDir();
+    await Promise.all(files.map((f) => convertToPdfCompatibleJpeg(path.join(UPLOADS_DIR, f.filename))));
+
+    const previousPhotos = db.prepare(
+      'SELECT file_path FROM handover_photos WHERE handover_id = ?'
+    ).all(handoverId) as Array<{ file_path: string }>;
+
+    const updateHandover = db.transaction(() => {
+      db.prepare(`
+        UPDATE handovers
+        SET company_id = ?,
+            company_name = ?,
+            company_address_line1 = ?,
+            company_address_line2 = ?,
+            company_postal_code = ?,
+            company_tax_id = ?,
+            company_phone = ?,
+            company_email = ?,
+            company_contact = ?,
+            issuer_name = ?,
+            issuer_address = ?,
+            issuer_tax_id = ?,
+            issuer_phone = ?,
+            issuer_email = ?,
+            prepared_by_name = ?,
+            trailer_id = ?,
+            handover_date = ?,
+            handover_time = ?,
+            equipment_notes = ?,
+            has_documents = ?,
+            beams_count = ?,
+            straps_count = ?
+        WHERE id = ?
+      `).run(
+        companyId,
+        companySnapshot.company_name,
+        companySnapshot.company_address_line1,
+        companySnapshot.company_address_line2,
+        companySnapshot.company_postal_code,
+        companySnapshot.company_tax_id,
+        companySnapshot.company_phone,
+        companySnapshot.company_email,
+        companySnapshot.company_contact,
+        issuerSnapshot.issuer_name,
+        issuerSnapshot.issuer_address,
+        issuerSnapshot.issuer_tax_id,
+        issuerSnapshot.issuer_phone,
+        issuerSnapshot.issuer_email,
+        preparedByName,
+        trailerId,
+        handover_date,
+        handover_time,
+        equipment_notes || '',
+        has_documents === '1' || has_documents === 'true' ? 1 : 0,
+        Number(beams_count) || 0,
+        Number(straps_count) || 0,
+        handoverId
+      );
+
+      db.prepare('DELETE FROM handover_photos WHERE handover_id = ?').run(handoverId);
+
+      const insertPhoto = db.prepare(
+        'INSERT INTO handover_photos (handover_id, file_path, position_on_template, description, has_issue, issue_description) VALUES (?, ?, ?, ?, ?, ?)'
+      );
+
+      for (let i = 0; i < files.length; i++) {
+        insertPhoto.run(
+          handoverId,
+          files[i].filename,
+          positions[i] || 'front',
+          descriptions[i] || '',
+          hasIssues[i] === '1' || hasIssues[i] === 'true' ? 1 : 0,
+          issueDescs[i] || ''
+        );
+      }
+
+      for (let i = 0; i < inhFilenames.length; i++) {
+        const originalFilename = inhFilenames[i];
+        const originalPath = path.join(UPLOADS_DIR, originalFilename);
+        if (fs.existsSync(originalPath)) {
+          const ext = path.extname(originalFilename);
+          const newFilename = `${uuidv4()}${ext}`;
+          const newPath = path.join(UPLOADS_DIR, newFilename);
+          fs.copyFileSync(originalPath, newPath);
+          insertPhoto.run(
+            handoverId,
+            newFilename,
+            inhPositions[i] || 'front',
+            inhDescriptions[i] || '',
+            inhHasIssues[i] === '1' || inhHasIssues[i] === 'true' ? 1 : 0,
+            inhIssueDescs[i] || ''
+          );
+        }
+      }
+    });
+
+    updateHandover();
+
+    for (const photo of previousPhotos) {
+      const filePath = path.join(UPLOADS_DIR, photo.file_path);
+      if (fs.existsSync(filePath)) {
+        try {
+          fs.unlinkSync(filePath);
+        } catch (err) {
+          console.warn('[handovers] Failed to remove previous photo file:', filePath, err);
+        }
+      }
+    }
+
+    res.json({ id: handoverId, message: 'Handover updated' });
+  } catch (err) {
+    console.error('Update handover error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.delete('/:id', requireAdmin, (req: Request, res: Response) => {
   try {
     const db = getDb();
@@ -413,7 +632,7 @@ router.delete('/:id', requireAdmin, (req: Request, res: Response) => {
     removeData();
 
     for (const photo of [...handoverPhotos, ...returnPhotos]) {
-      const filePath = path.join(__dirname, '..', '..', 'uploads', photo.file_path);
+      const filePath = path.join(getUploadsDir(), photo.file_path);
       if (fs.existsSync(filePath)) {
         try {
           fs.unlinkSync(filePath);

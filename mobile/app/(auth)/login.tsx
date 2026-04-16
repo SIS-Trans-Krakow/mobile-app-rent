@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import axios from 'axios';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, Alert,
   KeyboardAvoidingView, Platform, ActivityIndicator,
@@ -18,14 +19,48 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const showLoginDebug = (error: unknown) => {
+    if (axios.isAxiosError(error)) {
+      const requestUrl = `${error.config?.baseURL ?? ''}${error.config?.url ?? ''}`;
+      const responseData =
+        typeof error.response?.data === 'string'
+          ? error.response.data
+          : error.response?.data
+            ? JSON.stringify(error.response.data)
+            : error.message;
+
+      console.error('Login debug', {
+        requestUrl,
+        method: error.config?.method,
+        status: error.response?.status,
+        responseData: error.response?.data,
+        message: error.message,
+      });
+
+      Alert.alert(
+        t('common.error'),
+        [
+          `URL: ${requestUrl || 'unknown'}`,
+          `Status: ${error.response?.status ?? 'no response'}`,
+          `Method: ${error.config?.method?.toUpperCase() ?? 'unknown'}`,
+          `Response: ${responseData || 'empty'}`,
+        ].join('\n')
+      );
+      return;
+    }
+
+    console.error('Login debug', error);
+    Alert.alert(t('common.error'), String(error));
+  };
+
   const handleLogin = async () => {
     if (!username.trim() || !password.trim()) return;
     setLoading(true);
     try {
       await login(username.trim(), password);
       router.replace('/(app)');
-    } catch {
-      Alert.alert(t('common.error'), t('auth.invalidCredentials'));
+    } catch (error) {
+      showLoginDebug(error);
     } finally {
       setLoading(false);
     }

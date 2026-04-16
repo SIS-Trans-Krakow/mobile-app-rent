@@ -1,8 +1,6 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 
-const DB_PATH = path.join(__dirname, '..', '..', 'data', 'app.db');
-
 export const VALID_TRAILER_TYPES = [
   'Kurtyna', 'Box', 'Izoterma', 'Chłodnia', 'Kurtyna MEGA', 'TANDEM', 'Double Deck',
 ] as const;
@@ -11,14 +9,19 @@ const TRAILER_TYPE_CHECK = VALID_TRAILER_TYPES.map((t) => `'${t}'`).join(', ');
 
 let db: Database.Database;
 
+function resolveDbPath(): string {
+  return process.env.DB_PATH || path.join(__dirname, '..', '..', 'data', 'app.db');
+}
+
 export function getDb(): Database.Database {
   if (!db) {
     const fs = require('fs');
-    const dir = path.dirname(DB_PATH);
+    const dbPath = resolveDbPath();
+    const dir = path.dirname(dbPath);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    db = new Database(DB_PATH);
+    db = new Database(dbPath);
     db.pragma('journal_mode = WAL');
     migrateTrailersTable(db);
     db.pragma('foreign_keys = ON');
@@ -28,8 +31,17 @@ export function getDb(): Database.Database {
     migrateReturnsEquipmentFields(db);
     migrateHandoverPhotosIssueFields(db);
     migrateReturnPhotosDeltaFields(db);
+    migrateDocumentSnapshotTables(db);
   }
   return db;
+}
+
+export function resetDb(): void {
+  if (db) {
+    db.close();
+    // @ts-expect-error reset singleton between tests/app restarts
+    db = undefined;
+  }
 }
 
 function migrateTrailersTable(db: Database.Database): void {
@@ -115,9 +127,23 @@ function initSchema(db: Database.Database): void {
 
     CREATE TABLE IF NOT EXISTS handovers (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      company_id INTEGER NOT NULL,
+      company_id INTEGER,
       trailer_id INTEGER NOT NULL,
       created_by INTEGER NOT NULL,
+      company_name TEXT NOT NULL DEFAULT '',
+      company_address_line1 TEXT NOT NULL DEFAULT '',
+      company_address_line2 TEXT NOT NULL DEFAULT '',
+      company_postal_code TEXT NOT NULL DEFAULT '',
+      company_tax_id TEXT NOT NULL DEFAULT '',
+      company_phone TEXT NOT NULL DEFAULT '',
+      company_email TEXT NOT NULL DEFAULT '',
+      company_contact TEXT NOT NULL DEFAULT '',
+      issuer_name TEXT NOT NULL DEFAULT '',
+      issuer_address TEXT NOT NULL DEFAULT '',
+      issuer_tax_id TEXT NOT NULL DEFAULT '',
+      issuer_phone TEXT NOT NULL DEFAULT '',
+      issuer_email TEXT NOT NULL DEFAULT '',
+      prepared_by_name TEXT NOT NULL DEFAULT '',
       handover_date TEXT NOT NULL,
       handover_time TEXT NOT NULL,
       equipment_notes TEXT NOT NULL DEFAULT '',
@@ -145,6 +171,20 @@ function initSchema(db: Database.Database): void {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       handover_id INTEGER NOT NULL UNIQUE,
       created_by INTEGER NOT NULL,
+      company_name TEXT NOT NULL DEFAULT '',
+      company_address_line1 TEXT NOT NULL DEFAULT '',
+      company_address_line2 TEXT NOT NULL DEFAULT '',
+      company_postal_code TEXT NOT NULL DEFAULT '',
+      company_tax_id TEXT NOT NULL DEFAULT '',
+      company_phone TEXT NOT NULL DEFAULT '',
+      company_email TEXT NOT NULL DEFAULT '',
+      company_contact TEXT NOT NULL DEFAULT '',
+      issuer_name TEXT NOT NULL DEFAULT '',
+      issuer_address TEXT NOT NULL DEFAULT '',
+      issuer_tax_id TEXT NOT NULL DEFAULT '',
+      issuer_phone TEXT NOT NULL DEFAULT '',
+      issuer_email TEXT NOT NULL DEFAULT '',
+      prepared_by_name TEXT NOT NULL DEFAULT '',
       return_date TEXT NOT NULL,
       return_time TEXT NOT NULL,
       notes TEXT NOT NULL DEFAULT '',
@@ -172,6 +212,7 @@ function initSchema(db: Database.Database): void {
 
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_companies_name ON companies(name);
+    CREATE INDEX IF NOT EXISTS idx_companies_tax_id ON companies(tax_id);
     CREATE INDEX IF NOT EXISTS idx_trailers_registration_number ON trailers(registration_number);
   `);
 
@@ -296,4 +337,289 @@ function migrateReturnPhotosDeltaFields(db: Database.Database): void {
     db.exec("ALTER TABLE return_photos ADD COLUMN new_issue_description TEXT NOT NULL DEFAULT ''");
     console.log('[db] return_photos: added new_issue_description');
   }
+}
+
+function migrateDocumentSnapshotTables(db: Database.Database): void {
+  migrateHandoversSnapshotTable(db);
+  migrateReturnsSnapshotTable(db);
+}
+
+function migrateHandoversSnapshotTable(db: Database.Database): void {
+  const columns = db.prepare('PRAGMA table_info(handovers)').all() as Array<{
+    name: string;
+    notnull: number;
+  }>;
+
+  const names = columns.map((column) => column.name);
+  const companyIdColumn = columns.find((column) => column.name === 'company_id');
+  const requiredColumns = [
+    'company_name',
+    'company_address_line1',
+    'company_address_line2',
+    'company_postal_code',
+    'company_tax_id',
+    'company_phone',
+    'company_email',
+    'company_contact',
+    'issuer_name',
+    'issuer_address',
+    'issuer_tax_id',
+    'issuer_phone',
+    'issuer_email',
+    'prepared_by_name',
+  ];
+
+  const missingColumns = requiredColumns.filter((column) => !names.includes(column));
+  const companyIdRequiresRebuild = companyIdColumn?.notnull === 1;
+
+  if (missingColumns.length === 0 && !companyIdRequiresRebuild) {
+    return;
+  }
+
+  console.log('[db] Rebuilding handovers table for snapshot fields...');
+  db.pragma('foreign_keys = OFF');
+  const migrate = db.transaction(() => {
+    db.exec(`
+      CREATE TABLE handovers_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER,
+        trailer_id INTEGER NOT NULL,
+        created_by INTEGER NOT NULL,
+        company_name TEXT NOT NULL DEFAULT '',
+        company_address_line1 TEXT NOT NULL DEFAULT '',
+        company_address_line2 TEXT NOT NULL DEFAULT '',
+        company_postal_code TEXT NOT NULL DEFAULT '',
+        company_tax_id TEXT NOT NULL DEFAULT '',
+        company_phone TEXT NOT NULL DEFAULT '',
+        company_email TEXT NOT NULL DEFAULT '',
+        company_contact TEXT NOT NULL DEFAULT '',
+        issuer_name TEXT NOT NULL DEFAULT '',
+        issuer_address TEXT NOT NULL DEFAULT '',
+        issuer_tax_id TEXT NOT NULL DEFAULT '',
+        issuer_phone TEXT NOT NULL DEFAULT '',
+        issuer_email TEXT NOT NULL DEFAULT '',
+        prepared_by_name TEXT NOT NULL DEFAULT '',
+        handover_date TEXT NOT NULL,
+        handover_time TEXT NOT NULL,
+        equipment_notes TEXT NOT NULL DEFAULT '',
+        has_documents INTEGER NOT NULL DEFAULT 0,
+        beams_count INTEGER NOT NULL DEFAULT 0,
+        straps_count INTEGER NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'returned')),
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (company_id) REFERENCES companies(id),
+        FOREIGN KEY (trailer_id) REFERENCES trailers(id),
+        FOREIGN KEY (created_by) REFERENCES users(id)
+      );
+    `);
+
+    const rows = db.prepare(`
+      SELECT
+        h.*,
+        c.name AS source_company_name,
+        c.address AS source_company_address,
+        c.address_line1 AS source_company_address_line1,
+        c.address_line2 AS source_company_address_line2,
+        c.postal_code AS source_company_postal_code,
+        c.tax_id AS source_company_tax_id,
+        c.phone AS source_company_phone,
+        c.email AS source_company_email,
+        c.contact_person AS source_company_contact,
+        u.full_name AS source_prepared_by_name,
+        ip.name AS source_issuer_name,
+        ip.address AS source_issuer_address,
+        ip.tax_id AS source_issuer_tax_id,
+        ip.phone AS source_issuer_phone,
+        ip.email AS source_issuer_email
+      FROM handovers h
+      LEFT JOIN companies c ON c.id = h.company_id
+      LEFT JOIN users u ON u.id = h.created_by
+      LEFT JOIN issuer_company_profile ip ON ip.id = 1
+    `).all() as Array<Record<string, unknown>>;
+
+    const insert = db.prepare(`
+      INSERT INTO handovers_new (
+        id, company_id, trailer_id, created_by,
+        company_name, company_address_line1, company_address_line2, company_postal_code,
+        company_tax_id, company_phone, company_email, company_contact,
+        issuer_name, issuer_address, issuer_tax_id, issuer_phone, issuer_email, prepared_by_name,
+        handover_date, handover_time, equipment_notes, has_documents, beams_count, straps_count, status, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    for (const row of rows) {
+      insert.run(
+        row.id,
+        row.company_id ?? null,
+        row.trailer_id,
+        row.created_by,
+        row.company_name ?? row.source_company_name ?? '',
+        row.company_address_line1 ?? row.source_company_address_line1 ?? row.source_company_address ?? '',
+        row.company_address_line2 ?? row.source_company_address_line2 ?? '',
+        row.company_postal_code ?? row.source_company_postal_code ?? '',
+        row.company_tax_id ?? row.source_company_tax_id ?? '',
+        row.company_phone ?? row.source_company_phone ?? '',
+        row.company_email ?? row.source_company_email ?? '',
+        row.company_contact ?? row.source_company_contact ?? '',
+        row.issuer_name ?? row.source_issuer_name ?? '',
+        row.issuer_address ?? row.source_issuer_address ?? '',
+        row.issuer_tax_id ?? row.source_issuer_tax_id ?? '',
+        row.issuer_phone ?? row.source_issuer_phone ?? '',
+        row.issuer_email ?? row.source_issuer_email ?? '',
+        row.prepared_by_name ?? row.source_prepared_by_name ?? '',
+        row.handover_date,
+        row.handover_time,
+        row.equipment_notes,
+        row.has_documents,
+        row.beams_count,
+        row.straps_count,
+        row.status,
+        row.created_at
+      );
+    }
+
+    db.exec(`
+      DROP TABLE handovers;
+      ALTER TABLE handovers_new RENAME TO handovers;
+    `);
+  });
+  migrate();
+  db.pragma('foreign_keys = ON');
+  console.log('[db] handovers snapshot migration complete.');
+}
+
+function migrateReturnsSnapshotTable(db: Database.Database): void {
+  const tableExists = db.prepare(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='returns'"
+  ).get();
+  if (!tableExists) return;
+
+  const columns = db.prepare('PRAGMA table_info(returns)').all() as Array<{ name: string }>;
+  const names = columns.map((column) => column.name);
+  const requiredColumns = [
+    'company_name',
+    'company_address_line1',
+    'company_address_line2',
+    'company_postal_code',
+    'company_tax_id',
+    'company_phone',
+    'company_email',
+    'company_contact',
+    'issuer_name',
+    'issuer_address',
+    'issuer_tax_id',
+    'issuer_phone',
+    'issuer_email',
+    'prepared_by_name',
+  ];
+
+  const missingColumns = requiredColumns.filter((column) => !names.includes(column));
+  if (missingColumns.length === 0) {
+    return;
+  }
+
+  console.log('[db] Rebuilding returns table for snapshot fields...');
+  db.pragma('foreign_keys = OFF');
+  const migrate = db.transaction(() => {
+    db.exec(`
+      CREATE TABLE returns_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        handover_id INTEGER NOT NULL UNIQUE,
+        created_by INTEGER NOT NULL,
+        company_name TEXT NOT NULL DEFAULT '',
+        company_address_line1 TEXT NOT NULL DEFAULT '',
+        company_address_line2 TEXT NOT NULL DEFAULT '',
+        company_postal_code TEXT NOT NULL DEFAULT '',
+        company_tax_id TEXT NOT NULL DEFAULT '',
+        company_phone TEXT NOT NULL DEFAULT '',
+        company_email TEXT NOT NULL DEFAULT '',
+        company_contact TEXT NOT NULL DEFAULT '',
+        issuer_name TEXT NOT NULL DEFAULT '',
+        issuer_address TEXT NOT NULL DEFAULT '',
+        issuer_tax_id TEXT NOT NULL DEFAULT '',
+        issuer_phone TEXT NOT NULL DEFAULT '',
+        issuer_email TEXT NOT NULL DEFAULT '',
+        prepared_by_name TEXT NOT NULL DEFAULT '',
+        return_date TEXT NOT NULL,
+        return_time TEXT NOT NULL,
+        notes TEXT NOT NULL DEFAULT '',
+        return_has_documents INTEGER NOT NULL DEFAULT 0,
+        return_beams_count INTEGER NOT NULL DEFAULT 0,
+        return_straps_count INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (handover_id) REFERENCES handovers(id),
+        FOREIGN KEY (created_by) REFERENCES users(id)
+      );
+    `);
+
+    const rows = db.prepare(`
+      SELECT
+        r.*,
+        h.company_name AS source_company_name,
+        h.company_address_line1 AS source_company_address_line1,
+        h.company_address_line2 AS source_company_address_line2,
+        h.company_postal_code AS source_company_postal_code,
+        h.company_tax_id AS source_company_tax_id,
+        h.company_phone AS source_company_phone,
+        h.company_email AS source_company_email,
+        h.company_contact AS source_company_contact,
+        u.full_name AS source_prepared_by_name,
+        ip.name AS source_issuer_name,
+        ip.address AS source_issuer_address,
+        ip.tax_id AS source_issuer_tax_id,
+        ip.phone AS source_issuer_phone,
+        ip.email AS source_issuer_email
+      FROM returns r
+      LEFT JOIN handovers h ON h.id = r.handover_id
+      LEFT JOIN users u ON u.id = r.created_by
+      LEFT JOIN issuer_company_profile ip ON ip.id = 1
+    `).all() as Array<Record<string, unknown>>;
+
+    const insert = db.prepare(`
+      INSERT INTO returns_new (
+        id, handover_id, created_by,
+        company_name, company_address_line1, company_address_line2, company_postal_code,
+        company_tax_id, company_phone, company_email, company_contact,
+        issuer_name, issuer_address, issuer_tax_id, issuer_phone, issuer_email, prepared_by_name,
+        return_date, return_time, notes, return_has_documents, return_beams_count, return_straps_count, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    for (const row of rows) {
+      insert.run(
+        row.id,
+        row.handover_id,
+        row.created_by,
+        row.company_name ?? row.source_company_name ?? '',
+        row.company_address_line1 ?? row.source_company_address_line1 ?? '',
+        row.company_address_line2 ?? row.source_company_address_line2 ?? '',
+        row.company_postal_code ?? row.source_company_postal_code ?? '',
+        row.company_tax_id ?? row.source_company_tax_id ?? '',
+        row.company_phone ?? row.source_company_phone ?? '',
+        row.company_email ?? row.source_company_email ?? '',
+        row.company_contact ?? row.source_company_contact ?? '',
+        row.issuer_name ?? row.source_issuer_name ?? '',
+        row.issuer_address ?? row.source_issuer_address ?? '',
+        row.issuer_tax_id ?? row.source_issuer_tax_id ?? '',
+        row.issuer_phone ?? row.source_issuer_phone ?? '',
+        row.issuer_email ?? row.source_issuer_email ?? '',
+        row.prepared_by_name ?? row.source_prepared_by_name ?? '',
+        row.return_date,
+        row.return_time,
+        row.notes,
+        row.return_has_documents,
+        row.return_beams_count,
+        row.return_straps_count,
+        row.created_at
+      );
+    }
+
+    db.exec(`
+      DROP TABLE returns;
+      ALTER TABLE returns_new RENAME TO returns;
+    `);
+  });
+  migrate();
+  db.pragma('foreign_keys = ON');
+  console.log('[db] returns snapshot migration complete.');
 }

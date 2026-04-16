@@ -180,17 +180,25 @@ export default function HandoverDetailScreen() {
             </Text>
           </View>
           {user?.role === 'admin' && (
-            <TouchableOpacity
-              style={styles.deleteIconBtn}
-              onPress={confirmDelete}
-              disabled={deleting}
-            >
-              {deleting ? (
-                <ActivityIndicator size={16} color={Colors.danger} />
-              ) : (
-                <Ionicons name="trash-outline" size={18} color={Colors.danger} />
-              )}
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity
+                style={styles.editIconBtn}
+                onPress={() => router.push(`/(app)/handover/edit/${id}`)}
+              >
+                <Ionicons name="create-outline" size={18} color={Colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.deleteIconBtn}
+                onPress={confirmDelete}
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <ActivityIndicator size={16} color={Colors.danger} />
+                ) : (
+                  <Ionicons name="trash-outline" size={18} color={Colors.danger} />
+                )}
+              </TouchableOpacity>
+            </>
           )}
         </View>
       </View>
@@ -621,6 +629,16 @@ const styles = StyleSheet.create({
     borderColor: Colors.primary,
   },
   pdfBtnText: { color: Colors.primary, fontSize: FontSize.md, fontWeight: '600' },
+  editIconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    backgroundColor: '#eff6ff',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   deleteIconBtn: {
     width: 34,
     height: 34,

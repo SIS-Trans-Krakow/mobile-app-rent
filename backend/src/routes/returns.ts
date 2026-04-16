@@ -5,6 +5,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { getDb } from '../database/schema';
 import { authenticate } from '../middleware/auth';
 import { convertToPdfCompatibleJpeg } from '../utils/image';
+import { getIssuerSnapshot, getPreparedByName } from '../utils/documentSnapshots';
+import { getUploadsDir } from '../utils/paths';
 
 const router = Router();
 router.use(authenticate);
@@ -25,10 +27,9 @@ function mergeIssueDescriptions(baseText: string, deltaText: string): string {
 }
 
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png']);
-const ALLOWED_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png']);
 
 const storage = multer.diskStorage({
-  destination: path.join(__dirname, '..', '..', 'uploads'),
+  destination: getUploadsDir(),
   filename: (_req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
     cb(null, `${uuidv4()}${ext}`);
@@ -49,9 +50,8 @@ const upload = multer({
 router.get('/:id', (req: Request, res: Response) => {
   const db = getDb();
   const returnRecord = db.prepare(`
-    SELECT r.*, u.full_name as created_by_name
+    SELECT r.*, r.prepared_by_name AS created_by_name
     FROM returns r
-    JOIN users u ON r.created_by = u.id
     WHERE r.id = ?
   `).get(Number(req.params.id));
 
@@ -70,9 +70,8 @@ router.get('/:id', (req: Request, res: Response) => {
 router.get('/by-handover/:handoverId', (req: Request, res: Response) => {
   const db = getDb();
   const returnRecord = db.prepare(`
-    SELECT r.*, u.full_name as created_by_name
+    SELECT r.*, r.prepared_by_name AS created_by_name
     FROM returns r
-    JOIN users u ON r.created_by = u.id
     WHERE r.handover_id = ?
   `).get(Number(req.params.handoverId)) as any;
 
@@ -113,6 +112,9 @@ router.post('/', upload.array('photos', 20), async (req: Request, res: Response)
       res.status(400).json({ error: 'Return already exists for this handover' });
       return;
     }
+
+    const issuerSnapshot = getIssuerSnapshot(db);
+    const preparedByName = getPreparedByName(db, req.user!.userId);
 
     const files = (req.files as Express.Multer.File[]) || [];
     const positions = Array.isArray(photo_positions) ? photo_positions : photo_positions ? [photo_positions] : [];
@@ -181,10 +183,34 @@ router.post('/', upload.array('photos', 20), async (req: Request, res: Response)
     }
 
     const returnResult = db.prepare(`
-      INSERT INTO returns (handover_id, created_by, return_date, return_time, notes, return_has_documents, return_beams_count, return_straps_count)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO returns (
+        handover_id, created_by,
+        company_name, company_address_line1, company_address_line2, company_postal_code,
+        company_tax_id, company_phone, company_email, company_contact,
+        issuer_name, issuer_address, issuer_tax_id, issuer_phone, issuer_email, prepared_by_name,
+        return_date, return_time, notes, return_has_documents, return_beams_count, return_straps_count
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      Number(handover_id), req.user!.userId, return_date, return_time, notes || '',
+      Number(handover_id),
+      req.user!.userId,
+      handover.company_name || '',
+      handover.company_address_line1 || '',
+      handover.company_address_line2 || '',
+      handover.company_postal_code || '',
+      handover.company_tax_id || '',
+      handover.company_phone || '',
+      handover.company_email || '',
+      handover.company_contact || '',
+      issuerSnapshot.issuer_name,
+      issuerSnapshot.issuer_address,
+      issuerSnapshot.issuer_tax_id,
+      issuerSnapshot.issuer_phone,
+      issuerSnapshot.issuer_email,
+      preparedByName,
+      return_date,
+      return_time,
+      notes || '',
       return_has_documents === '1' || return_has_documents === 'true' ? 1 : 0,
       Number(return_beams_count) || 0,
       Number(return_straps_count) || 0,
@@ -193,7 +219,7 @@ router.post('/', upload.array('photos', 20), async (req: Request, res: Response)
 
     db.prepare('UPDATE handovers SET status = ? WHERE id = ?').run('returned', Number(handover_id));
 
-    const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads');
+    const UPLOADS_DIR = getUploadsDir();
     await Promise.all(files.map(f => convertToPdfCompatibleJpeg(path.join(UPLOADS_DIR, f.filename))));
 
     const insertPhoto = db.prepare(

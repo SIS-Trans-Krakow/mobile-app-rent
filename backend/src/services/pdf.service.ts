@@ -1,8 +1,8 @@
 import PDFDocument from 'pdfkit';
 import path from 'path';
 import fs from 'fs';
+import { getUploadsDir } from '../utils/paths';
 
-const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads');
 const FONT_CANDIDATES = [
   path.join(__dirname, '..', '..', 'assets', 'fonts', 'DejaVuSans.ttf'),
   '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
@@ -821,7 +821,7 @@ function drawPhotoGallery(
       height: 24,
     });
 
-    drawImageOrPlaceholder(doc, path.join(UPLOADS_DIR, photo.file_path), {
+    drawImageOrPlaceholder(doc, path.join(getUploadsDir(), photo.file_path), {
       x: x + 12,
       y: cardY + 58,
       width: cardWidth - 24,
@@ -1145,7 +1145,7 @@ export function generateReturnPdf(
 
     doc.fontSize(8).text('PRZEKAZANIE:', leftX, startY);
     if (handoverPhoto) {
-      const fp = path.join(UPLOADS_DIR, handoverPhoto.file_path);
+      const fp = path.join(getUploadsDir(), handoverPhoto.file_path);
       drawImageOrPlaceholder(doc, fp, { x: leftX, y: startY + 12, width: imgW, height: imgH });
       if (handoverPhoto.has_issue) {
         doc.fontSize(8).fillColor('#b45309')
@@ -1160,7 +1160,7 @@ export function generateReturnPdf(
 
     doc.fontSize(8).text('ZWROT:', rightX, startY);
     if (returnPhoto) {
-      const fp = path.join(UPLOADS_DIR, returnPhoto.file_path);
+      const fp = path.join(getUploadsDir(), returnPhoto.file_path);
       drawImageOrPlaceholder(doc, fp, { x: rightX, y: startY + 12, width: imgW, height: imgH });
       if (returnPhoto.has_issue) {
         const hasOriginalIssue = handoverIssuesByPos.has(returnPhoto.position_on_template);

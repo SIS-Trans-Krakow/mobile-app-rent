@@ -1,19 +1,19 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView,
   Alert, ActivityIndicator, Platform, Switch,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
-import api, { getUploadsUrl } from '../../../services/api';
-import { Colors, Spacing, FontSize, BorderRadius } from '../../../constants/theme';
-import CompanyLookup from '../../../components/CompanyLookup';
-import TrailerTemplate, { PhotoPosition, ZonePhoto, REQUIRED_POSITIONS } from '../../../components/TrailerTemplate';
-import PhotoCapture from '../../../components/PhotoCapture';
-import { useCompanyLookup } from '../../../hooks/useCompanyLookup';
-import { CompanyItem } from '../../../types/company';
-import { showPlatformAlert } from '../../../utils/showPlatformAlert';
+import api, { getUploadsUrl } from '../../../../services/api';
+import { Colors, Spacing, FontSize, BorderRadius } from '../../../../constants/theme';
+import CompanyLookup from '../../../../components/CompanyLookup';
+import TrailerTemplate, { PhotoPosition, ZonePhoto, REQUIRED_POSITIONS } from '../../../../components/TrailerTemplate';
+import PhotoCapture from '../../../../components/PhotoCapture';
+import { useCompanyLookup } from '../../../../hooks/useCompanyLookup';
+import { CompanyItem } from '../../../../types/company';
+import { showPlatformAlert } from '../../../../utils/showPlatformAlert';
 
 const TRAILER_TYPES = ['Kurtyna', 'Box', 'Izoterma', 'Chłodnia', 'Kurtyna MEGA', 'TANDEM', 'Double Deck'] as const;
 
@@ -40,19 +40,21 @@ const POSITION_LABELS: Record<PhotoPosition, string> = {
   'rear-left': 'photos.rearLeft',
   'rear-right': 'photos.rearRight',
 };
+
 const getCompanySummaryLines = (line1: string, line2: string, postalCode: string) => {
   return [line1.trim(), line2.trim()].filter(Boolean);
 };
 
-export default function NewHandoverScreen() {
+export default function EditHandoverScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
   const { t } = useTranslation();
   const router = useRouter();
 
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [screenLoading, setScreenLoading] = useState(true);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
-  // Company fields
   const [companyName, setCompanyName] = useState('');
   const [companyTaxId, setCompanyTaxId] = useState('');
   const [companyAddressLine1, setCompanyAddressLine1] = useState('');
@@ -64,21 +66,19 @@ export default function NewHandoverScreen() {
   const [companyId, setCompanyId] = useState<number | null>(null);
   const [saveCompanyToDb, setSaveCompanyToDb] = useState(false);
 
-  // Trailer search
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<TrailerResult[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [selectedTrailer, setSelectedTrailer] = useState<TrailerResult | null>(null);
+  const [originalTrailerId, setOriginalTrailerId] = useState<number | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Trailer fields
   const [registrationNumber, setRegistrationNumber] = useState('');
   const [vin, setVin] = useState('');
   const [brand, setBrand] = useState('');
   const [trailerType, setTrailerType] = useState<string>(TRAILER_TYPES[0]);
 
-  // Handover fields
   const [handoverDate, setHandoverDate] = useState(new Date().toISOString().split('T')[0]);
   const [handoverTime, setHandoverTime] = useState(
     new Date().toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })
@@ -88,8 +88,8 @@ export default function NewHandoverScreen() {
   const [strapsCount, setStrapsCount] = useState('');
   const [equipmentNotes, setEquipmentNotes] = useState('');
 
-  // Photos
   const [photos, setPhotos] = useState<Record<string, ZonePhoto | undefined>>({});
+  const [initialPhotos, setInitialPhotos] = useState<Record<string, ZonePhoto | undefined>>({});
   const [capturePosition, setCapturePosition] = useState<PhotoPosition | null>(null);
   const [lastReturnDate, setLastReturnDate] = useState<string | null>(null);
 
@@ -122,6 +122,7 @@ export default function NewHandoverScreen() {
     handleSearchChange: handleCompanySearchChange,
     selectCompany,
     clearSelectedCompany,
+    setInitialCompany,
   } = useCompanyLookup(applySelectedCompany);
 
   const handleClearCompanySelection = () => {
@@ -134,6 +135,100 @@ export default function NewHandoverScreen() {
       setCompanyId(null);
     }
     handleCompanySearchChange(text);
+  };
+
+  const isTrailerSelectable = useCallback((trailer: TrailerResult) => {
+    return Boolean(trailer.is_available_for_handover) || trailer.id === originalTrailerId;
+  }, [originalTrailerId]);
+
+  useEffect(() => {
+    void loadHandover();
+  }, [id]);
+
+  const loadHandover = async () => {
+    try {
+      setScreenLoading(true);
+      const res = await api.get(`/handovers/${id}`);
+      const data = res.data;
+
+      setCompanyName(data.company_name || '');
+      setCompanyTaxId(data.company_tax_id || '');
+      setCompanyAddressLine1(data.company_address_line1 || '');
+      setCompanyAddressLine2(data.company_address_line2 || '');
+      setCompanyPostalCode(data.company_postal_code || '');
+      setCompanyPhone(data.company_phone || '');
+      setCompanyEmail(data.company_email || '');
+      setCompanyContact(data.company_contact || '');
+      setCompanyId(data.company_id ?? null);
+      if (data.company_id) {
+        setInitialCompany({
+          id: data.company_id,
+          name: data.company_name || '',
+          address: '',
+          address_line1: data.company_address_line1 || '',
+          address_line2: data.company_address_line2 || '',
+          postal_code: data.company_postal_code || '',
+          tax_id: data.company_tax_id || '',
+          phone: data.company_phone || '',
+          email: data.company_email || '',
+          contact_person: data.company_contact || '',
+        });
+      } else {
+        setInitialCompany(null);
+      }
+
+      setRegistrationNumber(data.registration_number || '');
+      setSearchQuery(data.registration_number || '');
+      setVin(data.vin || '');
+      setBrand(data.brand || '');
+      if (TRAILER_TYPES.includes(data.trailer_type as any)) {
+        setTrailerType(data.trailer_type);
+      }
+
+      setHandoverDate(data.handover_date || new Date().toISOString().split('T')[0]);
+      setHandoverTime(
+        data.handover_time
+        || new Date().toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })
+      );
+      setHasDocuments(!!data.has_documents);
+      setBeamsCount(String(data.beams_count ?? 0));
+      setStrapsCount(String(data.straps_count ?? 0));
+      setEquipmentNotes(data.equipment_notes || '');
+
+      const currentTrailer: TrailerResult = {
+        id: data.trailer_id,
+        registration_number: data.registration_number || '',
+        vin: data.vin || '',
+        brand: data.brand || '',
+        type: data.trailer_type || TRAILER_TYPES[0],
+        production_date: data.production_date || '',
+        active_handover_id: data.status === 'active' ? data.id : null,
+        is_available_for_handover: true,
+      };
+      setSelectedTrailer(currentTrailer);
+      setOriginalTrailerId(data.trailer_id);
+
+      const existingPhotos: Record<string, ZonePhoto> = {};
+      for (const photo of data.photos || []) {
+        existingPhotos[photo.position_on_template] = {
+          uri: getUploadsUrl(photo.file_path),
+          position: photo.position_on_template as PhotoPosition,
+          description: photo.description || '',
+          hasIssue: !!photo.has_issue,
+          issueDescription: photo.issue_description || '',
+          isPreloaded: false,
+          preloadedFilePath: photo.file_path,
+        };
+      }
+      setPhotos(existingPhotos);
+      setInitialPhotos(existingPhotos);
+      setLastReturnDate(null);
+    } catch (err) {
+      console.error('Load handover for edit error:', err);
+      showError(t('common.error'));
+    } finally {
+      setScreenLoading(false);
+    }
   };
 
   const searchTrailers = useCallback((query: string) => {
@@ -174,7 +269,7 @@ export default function NewHandoverScreen() {
       (trailer) => trailer.registration_number.trim().toUpperCase() === normalized
     );
     if (localExact) {
-      if (!localExact.is_available_for_handover) {
+      if (!isTrailerSelectable(localExact)) {
         showError(t('handover.trailerUnavailableForHandover'));
         return;
       }
@@ -191,7 +286,7 @@ export default function NewHandoverScreen() {
         (trailer: TrailerResult) => trailer.registration_number.trim().toUpperCase() === normalized
       );
       if (exact) {
-        if (!exact.is_available_for_handover) {
+        if (!isTrailerSelectable(exact)) {
           showError(t('handover.trailerUnavailableForHandover'));
           return;
         }
@@ -211,8 +306,7 @@ export default function NewHandoverScreen() {
   };
 
   const selectTrailer = async (trailer: TrailerResult) => {
-    const isAvailable = Boolean(trailer.is_available_for_handover);
-    if (!isAvailable) {
+    if (!isTrailerSelectable(trailer)) {
       showError(t('handover.trailerUnavailableForHandover'));
       return;
     }
@@ -227,6 +321,12 @@ export default function NewHandoverScreen() {
     }
     setShowResults(false);
     setSearchResults([]);
+
+    if (trailer.id === originalTrailerId) {
+      setPhotos(initialPhotos);
+      setLastReturnDate(null);
+      return;
+    }
 
     try {
       const res = await api.get(`/trailers/${trailer.id}/last-return-photos`);
@@ -359,7 +459,7 @@ export default function NewHandoverScreen() {
       formData.append('straps_count', strapsCount || '0');
 
       for (const photo of photoEntries) {
-        if (photo.isPreloaded && photo.preloadedFilePath) {
+        if (photo.preloadedFilePath) {
           formData.append('inherited_photo_filenames', photo.preloadedFilePath);
           formData.append('inherited_photo_positions', photo.position);
           formData.append('inherited_photo_descriptions', photo.description || '');
@@ -382,18 +482,17 @@ export default function NewHandoverScreen() {
         }
       }
 
-      const res = await api.post('/handovers', formData, {
+      await api.patch(`/handovers/${id}`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      const createdId = res?.data?.id;
-      const target = createdId ? `/handover/${createdId}` : '/handover';
+      const target = `/(app)/handover/${id}`;
 
       if (Platform.OS === 'web') {
-        window.alert(t('handover.created'));
+        window.alert(t('handover.updated'));
         router.replace(target);
       } else {
-        Alert.alert(t('common.success'), t('handover.created'), [
+        Alert.alert(t('common.success'), t('handover.updated'), [
           { text: t('common.ok'), onPress: () => router.replace(target) },
         ]);
       }
@@ -536,89 +635,92 @@ export default function NewHandoverScreen() {
           {showResults && !isFromDb && (
             <View style={styles.resultsDropdown}>
               <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled>
-              {searchLoading ? (
-                <View style={styles.resultItem}>
-                  <Text style={styles.resultHint}>{t('handover.searching')}</Text>
-                </View>
-              ) : searchResults.length > 0 ? (
-                <>
-                  {searchResults.map((trailer) => (
+                {searchLoading ? (
+                  <View style={styles.resultItem}>
+                    <Text style={styles.resultHint}>{t('handover.searching')}</Text>
+                  </View>
+                ) : searchResults.length > 0 ? (
+                  <>
+                    {searchResults.map((trailer) => {
+                      const selectable = isTrailerSelectable(trailer);
+                      return (
+                        <TouchableOpacity
+                          key={trailer.id}
+                          style={[
+                            styles.resultItem,
+                            !selectable && styles.resultItemDisabled,
+                          ]}
+                          onPress={() => { void selectTrailer(trailer); }}
+                          disabled={!selectable}
+                          accessibilityRole="button"
+                          accessible
+                          accessibilityLabel={`${trailer.registration_number}`}
+                          accessibilityState={{ disabled: !selectable }}
+                        >
+                          <View style={styles.resultMain}>
+                            <Text
+                              style={[
+                                styles.resultReg,
+                                !selectable && styles.resultTextDisabled,
+                              ]}
+                            >
+                              {trailer.registration_number}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.resultMeta,
+                                !selectable && styles.resultTextDisabled,
+                              ]}
+                            >
+                              {[trailer.brand, t(`trailer.types.${trailer.type}`)].filter(Boolean).join(' · ')}
+                            </Text>
+                          </View>
+                          {!selectable ? (
+                            <Text style={styles.resultUnavailableText}>
+                              {t('handover.unavailableUntilReturn')}
+                            </Text>
+                          ) : null}
+                          {trailer.vin ? (
+                            <Text
+                              style={[
+                                styles.resultVin,
+                                !selectable && styles.resultTextDisabled,
+                              ]}
+                            >
+                              VIN: {trailer.vin}
+                            </Text>
+                          ) : null}
+                        </TouchableOpacity>
+                      );
+                    })}
                     <TouchableOpacity
-                      key={trailer.id}
-                      style={[
-                        styles.resultItem,
-                        !trailer.is_available_for_handover && styles.resultItemDisabled,
-                      ]}
-                      onPress={() => selectTrailer(trailer)}
-                      disabled={!trailer.is_available_for_handover}
+                      style={styles.resultItemManual}
+                      onPress={() => { void handleManualEntryFromSearch(); }}
                       accessibilityRole="button"
                       accessible
-                      accessibilityLabel={`${trailer.registration_number}`}
-                      accessibilityState={{ disabled: !trailer.is_available_for_handover }}
+                      accessibilityLabel={t('handover.manualEntry')}
                     >
-                      <View style={styles.resultMain}>
-                        <Text
-                          style={[
-                            styles.resultReg,
-                            !trailer.is_available_for_handover && styles.resultTextDisabled,
-                          ]}
-                        >
-                          {trailer.registration_number}
-                        </Text>
-                        <Text
-                          style={[
-                            styles.resultMeta,
-                            !trailer.is_available_for_handover && styles.resultTextDisabled,
-                          ]}
-                        >
-                          {[trailer.brand, t(`trailer.types.${trailer.type}`)].filter(Boolean).join(' · ')}
-                        </Text>
-                      </View>
-                      {!trailer.is_available_for_handover ? (
-                        <Text style={styles.resultUnavailableText}>
-                          {t('handover.unavailableUntilReturn')}
-                        </Text>
-                      ) : null}
-                      {trailer.vin ? (
-                        <Text
-                          style={[
-                            styles.resultVin,
-                            !trailer.is_available_for_handover && styles.resultTextDisabled,
-                          ]}
-                        >
-                          VIN: {trailer.vin}
-                        </Text>
-                      ) : null}
+                      <Ionicons name="add-circle-outline" size={18} color={Colors.primary} />
+                      <Text style={styles.resultManualText}>{t('handover.manualEntry')}</Text>
                     </TouchableOpacity>
-                  ))}
-                  <TouchableOpacity
-                    style={styles.resultItemManual}
-                    onPress={() => { void handleManualEntryFromSearch(); }}
-                    accessibilityRole="button"
-                    accessible
-                    accessibilityLabel={t('handover.manualEntry')}
-                  >
-                    <Ionicons name="add-circle-outline" size={18} color={Colors.primary} />
-                    <Text style={styles.resultManualText}>{t('handover.manualEntry')}</Text>
-                  </TouchableOpacity>
-                </>
-              ) : (
-                <>
-                  <View style={styles.resultItem}>
-                    <Text style={styles.resultHint}>{t('handover.noTrailersFound')}</Text>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.resultItemManual}
-                    onPress={() => { void handleManualEntryFromSearch(); }}
-                    accessibilityRole="button"
-                    accessible
-                    accessibilityLabel={t('handover.manualEntry')}
-                  >
-                    <Ionicons name="add-circle-outline" size={18} color={Colors.primary} />
-                    <Text style={styles.resultManualText}>{t('handover.manualEntry')}</Text>
-                  </TouchableOpacity>
-                </>
-              )}
+                  </>
+                ) : (
+                  <>
+                    <View style={styles.resultItem}>
+                      <Text style={styles.resultHint}>{t('handover.noTrailersFound')}</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.resultItemManual}
+                      onPress={() => { void handleManualEntryFromSearch(); }}
+                      accessibilityRole="button"
+                      accessible
+                      accessibilityLabel={t('handover.manualEntry')}
+                    >
+                      <Ionicons name="add-circle-outline" size={18} color={Colors.primary} />
+                      <Text style={styles.resultManualText}>{t('handover.manualEntry')}</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
               </ScrollView>
             </View>
           )}
@@ -817,9 +919,16 @@ export default function NewHandoverScreen() {
   const steps = [renderCompanyStep, renderTrailerStep, renderPhotosStep, renderSummary];
   const stepLabels = [t('handover.company'), t('handover.trailer'), t('handover.photos'), t('handover.summary')];
 
+  if (screenLoading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      {/* Progress */}
       <View style={styles.progress}>
         {stepLabels.map((label, i) => (
           <View key={i} style={styles.progressItem}>
@@ -835,7 +944,6 @@ export default function NewHandoverScreen() {
         ))}
       </View>
 
-      {/* Step content */}
       <View style={styles.content}>
         {steps[step]()}
       </View>
@@ -847,7 +955,6 @@ export default function NewHandoverScreen() {
         </View>
       ) : null}
 
-      {/* Navigation */}
       <View style={styles.nav}>
         {step > 0 && (
           <TouchableOpacity
@@ -886,13 +993,13 @@ export default function NewHandoverScreen() {
             disabled={loading}
             accessibilityRole="button"
             accessible
-            accessibilityLabel={t('common.submit')}
+            accessibilityLabel={t('common.save')}
             accessibilityState={{ disabled: loading }}
           >
             {loading ? (
               <ActivityIndicator color={Colors.white} />
             ) : (
-              <Text style={styles.navBtnText}>{t('common.submit')}</Text>
+              <Text style={styles.navBtnText}>{t('common.save')}</Text>
             )}
           </TouchableOpacity>
         )}
@@ -914,6 +1021,7 @@ export default function NewHandoverScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scrollContent: { padding: Spacing.md },
   progress: {
     flexDirection: 'row',

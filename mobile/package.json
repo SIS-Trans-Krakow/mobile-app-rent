@@ -6,7 +6,10 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "build:android:apk": "EAS_NO_VCS=1 EAS_PROJECT_ROOT=\"$PWD\" npx eas-cli@latest build --platform android --profile preview",
+    "build:android:aab": "EAS_NO_VCS=1 EAS_PROJECT_ROOT=\"$PWD\" npx eas-cli@latest build --platform android --profile production",
+    "build:inspect:android": "EAS_NO_VCS=1 EAS_PROJECT_ROOT=\"$PWD\" npx eas-cli@latest build:inspect --platform android --stage archive"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

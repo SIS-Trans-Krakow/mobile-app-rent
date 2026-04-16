@@ -6,39 +6,25 @@ import { generateHandoverPdf, generateReturnPdf } from '../services/pdf.service'
 const router = Router();
 router.use(authenticate);
 
-function getIssuerCompanyProfile() {
-  const db = getDb();
-  return (
-    db.prepare(
-      'SELECT name, address, tax_id, phone, email FROM issuer_company_profile WHERE id = 1'
-    ).get() as
-      | { name: string; address: string; tax_id: string; phone: string; email: string }
-      | undefined
-  ) ?? {
-    name: '',
-    address: '',
-    tax_id: '',
-    phone: '',
-    email: '',
+function getIssuerSnapshotForPdf(record: any) {
+  return {
+    name: record?.issuer_name || '',
+    address: record?.issuer_address || '',
+    tax_id: record?.issuer_tax_id || '',
+    phone: record?.issuer_phone || '',
+    email: record?.issuer_email || '',
   };
 }
 
 router.get('/handover/:id', (req: Request, res: Response) => {
   const db = getDb();
   const handover = db.prepare(`
-    SELECT h.*, c.name as company_name,
-           COALESCE(NULLIF(c.address_line1, ''), c.address) as company_address_line1,
-           c.address_line2 as company_address_line2,
-           c.postal_code as company_postal_code,
-           c.tax_id as company_tax_id,
-           c.phone as company_phone, c.email as company_email, c.contact_person as company_contact,
+    SELECT h.*,
+           h.prepared_by_name AS created_by_name,
            t.registration_number, t.vin, t.brand, t.type as trailer_type,
-           t.production_date,
-           u.full_name as created_by_name
+           t.production_date
     FROM handovers h
-    JOIN companies c ON h.company_id = c.id
     JOIN trailers t ON h.trailer_id = t.id
-    JOIN users u ON h.created_by = u.id
     WHERE h.id = ?
   `).get(Number(req.params.id)) as any;
 
@@ -48,9 +34,8 @@ router.get('/handover/:id', (req: Request, res: Response) => {
   }
 
   const returnRecord = db.prepare(`
-    SELECT r.*, u.full_name as created_by_name
+    SELECT r.*, r.prepared_by_name AS created_by_name
     FROM returns r
-    JOIN users u ON r.created_by = u.id
     WHERE r.handover_id = ?
   `).get(Number(req.params.id)) as any;
 
@@ -68,7 +53,7 @@ router.get('/handover/:id', (req: Request, res: Response) => {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=zwrot_${returnRecord.id}.pdf`);
 
-    const returnDoc = generateReturnPdf(handover, returnRecord, getIssuerCompanyProfile());
+    const returnDoc = generateReturnPdf(handover, returnRecord, getIssuerSnapshotForPdf(returnRecord));
     returnDoc.pipe(res);
     returnDoc.end();
     return;
@@ -83,7 +68,7 @@ router.get('/handover/:id', (req: Request, res: Response) => {
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename=przekazanie_${handover.id}.pdf`);
 
-  const doc = generateHandoverPdf(handover, getIssuerCompanyProfile());
+  const doc = generateHandoverPdf(handover, getIssuerSnapshotForPdf(handover));
   doc.pipe(res);
   doc.end();
 });
@@ -91,9 +76,8 @@ router.get('/handover/:id', (req: Request, res: Response) => {
 router.get('/return/:id', (req: Request, res: Response) => {
   const db = getDb();
   const returnRecord = db.prepare(`
-    SELECT r.*, u.full_name as created_by_name
+    SELECT r.*, r.prepared_by_name AS created_by_name
     FROM returns r
-    JOIN users u ON r.created_by = u.id
     WHERE r.id = ?
   `).get(Number(req.params.id)) as any;
 
@@ -108,19 +92,12 @@ router.get('/return/:id', (req: Request, res: Response) => {
   returnRecord.photos = returnPhotos;
 
   const handover = db.prepare(`
-    SELECT h.*, c.name as company_name,
-           COALESCE(NULLIF(c.address_line1, ''), c.address) as company_address_line1,
-           c.address_line2 as company_address_line2,
-           c.postal_code as company_postal_code,
-           c.tax_id as company_tax_id,
-           c.phone as company_phone, c.email as company_email, c.contact_person as company_contact,
+    SELECT h.*,
+           h.prepared_by_name AS created_by_name,
            t.registration_number, t.vin, t.brand, t.type as trailer_type,
-           t.production_date,
-           u.full_name as created_by_name
+           t.production_date
     FROM handovers h
-    JOIN companies c ON h.company_id = c.id
     JOIN trailers t ON h.trailer_id = t.id
-    JOIN users u ON h.created_by = u.id
     WHERE h.id = ?
   `).get(returnRecord.handover_id) as any;
 
@@ -132,7 +109,7 @@ router.get('/return/:id', (req: Request, res: Response) => {
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename=zwrot_${returnRecord.id}.pdf`);
 
-  const doc = generateReturnPdf(handover, returnRecord, getIssuerCompanyProfile());
+  const doc = generateReturnPdf(handover, returnRecord, getIssuerSnapshotForPdf(returnRecord));
   doc.pipe(res);
   doc.end();
 });

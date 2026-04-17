@@ -1,6 +1,6 @@
 # Trailer Handover Management App
 
-Full-stack application for managing trailer (naczepa) handovers and returns. Includes a mobile app (Android + web preview) built with Expo/React Native and a Node.js backend with SQLite database.
+Full-stack application for managing trailer (naczepa) handovers and returns. Includes a mobile app (Android + web build) built with Expo/React Native and a Node.js backend with SQLite database. The web build can be deployed to any static host (the included deploy script targets `/var/www/html/odbiory`).
 
 ## Features
 
@@ -227,7 +227,14 @@ Add the following to `backend/.env` (copy from `.env.example`):
 DEPLOY_USER=ubuntu
 DEPLOY_HOST=1.2.3.4
 DEPLOY_PATH=/home/ubuntu/trailer-handover-api
+# Optional — defaults to /var/www/html/odbiory
+DEPLOY_WEB_PATH=/var/www/html/odbiory
+# Optional — sub-path the web app is served from. Defaults to /<basename of DEPLOY_WEB_PATH>
+# (e.g. /odbiory). Set to "/" if you serve at the web server root.
+DEPLOY_WEB_BASE_URL=/odbiory
 ```
+
+> The web deploy step uses `sudo` on the remote server only for `mkdir`/`chown` of `${DEPLOY_WEB_PATH}` (interactive — you'll be prompted for the sudo password once via TTY). The actual `rsync` runs as `${DEPLOY_USER}` after the directory ownership has been set, so no passwordless sudo is required.
 
 ### 2. First deploy
 
@@ -245,6 +252,7 @@ This will (only installs what's missing — safe on shared servers):
 5. Push local `.env` to server
 6. Run `npm install` + `tsc` build
 7. Start app with PM2 and enable systemd autostart
+8. Build the mobile **web app** (`expo export --platform web`) and upload `mobile/dist/` to `/var/www/html/odbiory` on the server
 
 ### 3. Deploy code updates
 
@@ -253,17 +261,97 @@ cd backend
 ./deploy.sh
 ```
 
-Syncs code → `npm install` → build → PM2 restart.
+Syncs code → `npm install` → build → PM2 restart → build & upload mobile web app to `/var/www/html/odbiory`.
+
+### Deploying just the web app
+
+If only the mobile/web bundle changed, you can skip the backend steps:
+
+```bash
+cd backend
+./deploy.sh --web
+```
+
+This runs `npm install` + `EXPO_BASE_URL=/odbiory npx expo export --platform web` in `mobile/`, then `rsync`s `mobile/dist/` to `${DEPLOY_WEB_PATH}` (default `/var/www/html/odbiory`) on the server. After upload, ownership is set to `www-data:www-data` so the web server can read the files.
+
+> **Important — sub-path serving:** because the app is served from `/odbiory/` (not `/`), the build is produced with `EXPO_BASE_URL=/odbiory` so all asset URLs and Expo Router routes are prefixed correctly. The deploy script derives this prefix automatically from the basename of `DEPLOY_WEB_PATH`, but you can override it via `DEPLOY_WEB_BASE_URL` in `backend/.env`. If you ever serve the app from the root of a domain, set `DEPLOY_WEB_BASE_URL=/`.
+
+#### Apache configuration
+
+The deploy script automatically writes a `.htaccess` file into `mobile/dist/` (and therefore into `${DEPLOY_WEB_PATH}` after upload) that:
+
+- Falls back unknown routes to `index.html` so Expo Router deep links and full-page refreshes work.
+- Sets correct MIME types for `.ttf` / `.woff2` font files used by `@expo/vector-icons`.
+- Enables gzip compression and sane `Cache-Control` defaults for static assets.
+
+For this to work, Apache needs:
+
+1. `mod_rewrite`, `mod_mime`, `mod_deflate`, `mod_expires` enabled
+   ```bash
+   sudo a2enmod rewrite mime deflate expires
+   sudo systemctl reload apache2
+   ```
+2. `AllowOverride All` for `/var/www/` (so the `.htaccess` is honoured). **On stock Ubuntu / Debian Apache this defaults to `None`, which silently disables `.htaccess` — you must change it.** Verify and fix in `/etc/apache2/apache2.conf`:
+   ```bash
+   grep -A3 "Directory /var/www" /etc/apache2/apache2.conf
+   ```
+   The block must look like this (note `AllowOverride All`, not `None`):
+   ```apache
+   <Directory /var/www/>
+       Options Indexes FollowSymLinks
+       AllowOverride All
+       Require all granted
+   </Directory>
+   ```
+   One-liner to flip it from `None` to `All`:
+   ```bash
+   sudo sed -i 's|AllowOverride None|AllowOverride All|' /etc/apache2/apache2.conf
+   sudo apache2ctl configtest && sudo systemctl reload apache2
+   ```
+
+That's it — no VirtualHost changes are required. The app will be served at `http://<server>/odbiory/`.
+
+##### Symptom: 404 on deep links / page refresh
+
+If `http://<server>/odbiory/` loads fine, but visiting (or refreshing) a sub-route like `http://<server>/odbiory/return/select` returns Apache's **404 Not Found**, it means the `.htaccess` SPA fallback isn't being applied. Quick checklist:
+
+```bash
+# 1. .htaccess is actually deployed
+ls -la /var/www/html/odbiory/.htaccess
+
+# 2. mod_rewrite is loaded
+apache2ctl -M | grep rewrite
+
+# 3. AllowOverride is "All" for /var/www/
+grep -A3 "Directory /var/www" /etc/apache2/apache2.conf
+```
+
+If any of these is missing, fix it as described above and reload Apache.
+
+If you instead want a dedicated VirtualHost (e.g. `odbiory.example.com`) and serve from the root, build with `DEPLOY_WEB_BASE_URL=/` and use:
+
+```apache
+<VirtualHost *:80>
+    ServerName odbiory.example.com
+    DocumentRoot /var/www/html/odbiory
+
+    <Directory /var/www/html/odbiory>
+        AllowOverride All
+        Require all granted
+    </Directory>
+</VirtualHost>
+```
 
 ### All commands
 
 
 | Command                            | Description                                           |
 | ---------------------------------- | ----------------------------------------------------- |
-| `./deploy.sh`                      | Push code update (sync → build → restart)             |
-| `./deploy.sh --init`               | First-time full setup                                 |
+| `./deploy.sh`                      | Push code update (sync → build → restart → web)       |
+| `./deploy.sh --init`               | First-time full setup (incl. web upload)              |
 | `./deploy.sh --host 10.0.0.5`      | Override target IP for any command                    |
 | `./deploy.sh --env`                | Push local `.env` to server                           |
+| `./deploy.sh --web`                | Build & upload mobile web app → `/var/www/html/odbiory` |
 | `./deploy.sh --db-pull`            | Download `data/app.db` from server → local            |
 | `./deploy.sh --db-push`            | Upload local DB to server (stops app during transfer) |
 | `./deploy.sh --db-migrate OLD NEW` | Transfer DB directly between two servers              |

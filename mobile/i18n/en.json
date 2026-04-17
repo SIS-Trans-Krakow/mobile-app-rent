@@ -19,6 +19,12 @@
     "language": "Language",
     "settings": "Settings"
   },
+  "connectivity": {
+    "offlineTitle": "No connection to the server",
+    "offlineSubtitle": "Check your internet connection or try again in a moment.",
+    "retry": "Try again",
+    "loadError": "Failed to load data. Check your connection to the server."
+  },
   "auth": {
     "login": "Login",
     "username": "Username",

@@ -73,13 +73,17 @@ export default function ProfileScreen() {
       quality: 1,
       allowsEditing: false,
       mediaTypes: ['images'],
+      base64: Platform.OS === 'web',
     });
     if (result.canceled || !result.assets[0]) return;
     const asset = result.assets[0];
     const uri = asset.uri;
+    const mime = asset.mimeType?.toLowerCase();
+    const fileName = (asset as any).fileName?.toLowerCase?.() || '';
     const isPng =
-      (asset.mimeType && asset.mimeType.toLowerCase() === 'image/png')
-      || uri.toLowerCase().endsWith('.png');
+      mime === 'image/png'
+      || uri.toLowerCase().endsWith('.png')
+      || fileName.endsWith('.png');
 
     if (!isPng) {
       showPlatformAlert(t('common.error'), t('profile.uploadInvalid'));
@@ -87,8 +91,32 @@ export default function ProfileScreen() {
     }
 
     try {
-      const file = new File(uri);
-      const base64 = await file.base64();
+      let base64: string | null | undefined = asset.base64;
+
+      if (!base64) {
+        if (Platform.OS === 'web') {
+          const response = await fetch(uri);
+          const blob = await response.blob();
+          base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const result = reader.result as string;
+              const commaIdx = result.indexOf(',');
+              resolve(commaIdx >= 0 ? result.slice(commaIdx + 1) : result);
+            };
+            reader.onerror = () => reject(reader.error);
+            reader.readAsDataURL(blob);
+          });
+        } else {
+          const file = new File(uri);
+          base64 = await file.base64();
+        }
+      }
+
+      if (!base64) {
+        throw new Error('Empty base64');
+      }
+
       const dataUrl = `data:image/png;base64,${base64}`;
       await uploadBase64(dataUrl);
     } catch (err) {

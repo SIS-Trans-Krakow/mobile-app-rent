@@ -19,6 +19,12 @@
     "language": "Język",
     "settings": "Ustawienia"
   },
+  "connectivity": {
+    "offlineTitle": "Brak połączenia z serwerem",
+    "offlineSubtitle": "Sprawdź połączenie z internetem lub spróbuj ponownie za chwilę.",
+    "retry": "Spróbuj ponownie",
+    "loadError": "Nie udało się pobrać danych. Sprawdź połączenie z serwerem."
+  },
   "auth": {
     "login": "Logowanie",
     "username": "Nazwa użytkownika",

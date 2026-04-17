@@ -1,12 +1,12 @@
 import React, { useRef, useState } from 'react';
 import {
   Modal,
-  SafeAreaView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import SignatureScreen, { SignatureViewRef } from 'react-native-signature-canvas';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
@@ -76,7 +76,7 @@ export default function SignaturePad({ visible, onClose, onSave, title }: Props)
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
-      <SafeAreaView style={styles.safe}>
+      <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} style={styles.headerBtn} accessibilityRole="button">
             <Ionicons name="close" size={26} color={Colors.gray700} />

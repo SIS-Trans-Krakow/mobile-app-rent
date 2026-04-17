@@ -21,6 +21,14 @@ export default function LoginScreen() {
 
   const showLoginDebug = (error: unknown) => {
     if (axios.isAxiosError(error)) {
+      // No HTTP response means we couldn't reach the backend at all - show a
+      // friendly, localized message instead of the developer-style debug
+      // dump (the global offline banner is already showing too).
+      if (!error.response) {
+        Alert.alert(t('connectivity.offlineTitle'), t('connectivity.offlineSubtitle'));
+        return;
+      }
+
       const requestUrl = `${error.config?.baseURL ?? ''}${error.config?.url ?? ''}`;
       const responseData =
         typeof error.response?.data === 'string'

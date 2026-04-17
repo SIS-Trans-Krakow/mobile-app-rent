@@ -6,6 +6,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../../../services/api';
+import { useConnectivityStore } from '../../../stores/connectivity';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../../constants/theme';
 
 interface HandoverItem {
@@ -26,21 +27,26 @@ export default function HandoverListScreen() {
   const router = useRouter();
   const [handovers, setHandovers] = useState<HandoverItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [registrationQuery, setRegistrationQuery] = useState('');
+  const retryToken = useConnectivityStore((s) => s.retryToken);
+  const isOffline = useConnectivityStore((s) => s.isOffline);
 
   useFocusEffect(
     useCallback(() => {
       loadHandovers();
-    }, [])
+    }, [retryToken])
   );
 
   const loadHandovers = async () => {
     try {
+      setLoadError(false);
       const res = await api.get('/handovers');
       setHandovers(res.data);
     } catch (err) {
       console.error('Load handovers error:', err);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -120,7 +126,23 @@ export default function HandoverListScreen() {
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={styles.list}
         ListEmptyComponent={
-          <Text style={styles.empty}>{t('common.noData')}</Text>
+          (loadError || isOffline) ? (
+            <View style={styles.errorBox}>
+              <Ionicons name="cloud-offline-outline" size={40} color={Colors.danger} />
+              <Text style={styles.errorTitle}>{t('connectivity.offlineTitle')}</Text>
+              <Text style={styles.errorSubtitle}>{t('connectivity.loadError')}</Text>
+              <TouchableOpacity
+                style={styles.retryBtn}
+                onPress={loadHandovers}
+                accessibilityRole="button"
+              >
+                <Ionicons name="refresh" size={16} color={Colors.white} />
+                <Text style={styles.retryBtnText}>{t('connectivity.retry')}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <Text style={styles.empty}>{t('common.noData')}</Text>
+          )
         }
         renderItem={({ item }) => (
           <TouchableOpacity
@@ -223,6 +245,39 @@ const styles = StyleSheet.create({
   },
   list: { padding: Spacing.md },
   empty: { textAlign: 'center', color: Colors.textSecondary, marginTop: Spacing.xl },
+  errorBox: {
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.xl,
+    gap: Spacing.xs,
+  },
+  errorTitle: {
+    fontSize: FontSize.md,
+    fontWeight: '700',
+    color: Colors.text,
+    marginTop: Spacing.sm,
+    textAlign: 'center',
+  },
+  errorSubtitle: {
+    fontSize: FontSize.sm,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: Spacing.md,
+  },
+  retryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.primary,
+  },
+  retryBtnText: {
+    color: Colors.white,
+    fontWeight: '700',
+    fontSize: FontSize.sm,
+  },
   card: {
     backgroundColor: Colors.white,
     borderRadius: BorderRadius.md,

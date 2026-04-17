@@ -34,8 +34,10 @@ export default function CompanyLookup({
   onSelectCompany,
   onClearSelection,
 }: CompanyLookupProps) {
+  const isDropdownOpen = showResults && !selectedCompany;
+
   return (
-    <View style={styles.wrapper}>
+    <View style={[styles.wrapper, isDropdownOpen && styles.wrapperElevated]}>
       <View style={styles.sectionHeader}>
         <Ionicons name='server' size={16} color={Colors.primary} />
         <Text style={styles.sectionLabel}>{label}</Text>
@@ -129,6 +131,15 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 4,
     elevation: 3,
+    zIndex: 1,
+  },
+  // When the suggestions dropdown is open we need to bump the wrapper above
+  // sibling form fields so the absolutely-positioned dropdown is not covered
+  // by the "Nazwa firmy *" label/input that follows it (Android needs
+  // `elevation`, iOS uses `zIndex`).
+  wrapperElevated: {
+    zIndex: 1000,
+    elevation: 50,
   },
   sectionHeader: {
     flexDirection: 'row',

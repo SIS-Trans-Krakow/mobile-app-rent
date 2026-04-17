@@ -74,10 +74,6 @@ export default function SignaturePad({ visible, onClose, onSave, title }: Props)
     setIsEmpty(false);
   };
 
-  const handleEnd = () => {
-    ref.current?.readSignature();
-  };
-
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
       <SafeAreaView style={styles.safe}>
@@ -99,7 +95,6 @@ export default function SignaturePad({ visible, onClose, onSave, title }: Props)
             onOK={handleOK}
             onEmpty={handleEmpty}
             onBegin={handleBegin}
-            onEnd={handleEnd}
             webStyle={PAD_STYLE}
             backgroundColor="#ffffff"
             penColor="#111827"

@@ -183,6 +183,38 @@
     "changePhoto": "Zmień",
     "fillMissingPhotos": "Uzupełnij brakujące zdjęcia"
   },
+  "signature": {
+    "addClientSignature": "Podpis odręczny cyfrowy",
+    "clientSignatureTitle": "Podpis klienta",
+    "clientSignatureSaved": "Podpis klienta dodany",
+    "change": "Zmień podpis",
+    "remove": "Usuń podpis",
+    "padTitle": "Złóż podpis",
+    "padHint": "Podpisz palcem lub rysikiem w polu poniżej",
+    "clear": "Wyczyść",
+    "save": "Zapisz podpis",
+    "cancel": "Anuluj",
+    "empty": "Pole podpisu jest puste",
+    "errorSaving": "Nie udało się zapisać podpisu",
+    "preview": "Podgląd podpisu",
+    "optional": "Opcjonalne — podpisz, jeśli chcesz załączyć podpis odręczny do PDF"
+  },
+  "profile": {
+    "title": "Mój profil",
+    "menuLabel": "Mój profil",
+    "signatureSection": "Mój podpis (wydający)",
+    "signatureDescription": "Twój podpis zostanie automatycznie wstawiony do generowanych dokumentów PDF jako podpis wydającego.",
+    "signaturePresent": "Podpis ustawiony",
+    "signatureMissing": "Brak podpisu",
+    "drawSignature": "Złóż podpis w aplikacji",
+    "uploadPng": "Wgraj plik PNG",
+    "removeSignature": "Usuń podpis",
+    "signatureUpdated": "Podpis zaktualizowany",
+    "signatureRemoved": "Podpis usunięty",
+    "uploadInvalid": "Plik musi być w formacie PNG",
+    "loadError": "Nie udało się wczytać podpisu",
+    "saveError": "Nie udało się zapisać podpisu"
+  },
   "admin": {
     "users": "Użytkownicy",
     "clients": "Klienci",

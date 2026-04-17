@@ -3,6 +3,9 @@ import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList,
   Alert, ActivityIndicator, Modal, Switch,
 } from 'react-native';
+import { KeyboardAwareScrollView } from '../../../utils/keyboardController';
+
+const ScrollContainer: React.ComponentType<any> = KeyboardAwareScrollView;
 import { useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
@@ -274,7 +277,7 @@ export default function UsersScreen() {
             <View style={{ width: 28 }} />
           </View>
 
-          <View style={styles.modalBody}>
+          <ScrollContainer contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled" bottomOffset={Spacing.lg}>
             <Text style={styles.label}>{t('auth.username')} *</Text>
             <TextInput style={styles.input} value={newUsername} onChangeText={setNewUsername}
               autoCapitalize="none" placeholder={t('auth.username')} placeholderTextColor={Colors.gray400} />
@@ -314,7 +317,7 @@ export default function UsersScreen() {
                 <Text style={styles.createBtnText}>{t('admin.createUser')}</Text>
               )}
             </TouchableOpacity>
-          </View>
+          </ScrollContainer>
         </View>
       </Modal>
 
@@ -328,7 +331,7 @@ export default function UsersScreen() {
             <View style={{ width: 28 }} />
           </View>
 
-          <View style={styles.modalBody}>
+          <ScrollContainer contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled" bottomOffset={Spacing.lg}>
             {editTargetUser ? (
               <Text style={styles.helperText}>
                 {t('admin.setFullNameFor', { username: editTargetUser.username })}
@@ -351,7 +354,7 @@ export default function UsersScreen() {
                 <Text style={styles.createBtnText}>{t('common.save')}</Text>
               )}
             </TouchableOpacity>
-          </View>
+          </ScrollContainer>
         </View>
       </Modal>
 
@@ -365,7 +368,7 @@ export default function UsersScreen() {
             <View style={{ width: 28 }} />
           </View>
 
-          <View style={styles.modalBody}>
+          <ScrollContainer contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled" bottomOffset={Spacing.lg}>
             {passwordTargetUser ? (
               <Text style={styles.helperText}>
                 {t('admin.setPasswordFor', { name: passwordTargetUser.full_name })}
@@ -399,7 +402,7 @@ export default function UsersScreen() {
                 <Text style={styles.createBtnText}>{t('admin.changePassword')}</Text>
               )}
             </TouchableOpacity>
-          </View>
+          </ScrollContainer>
         </View>
       </Modal>
     </View>

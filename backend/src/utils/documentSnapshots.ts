@@ -94,6 +94,14 @@ export function getPreparedByName(db: Database.Database, userId: number): string
   return normalizeText(user?.full_name);
 }
 
+export function getIssuerSignaturePath(db: Database.Database, userId: number): string {
+  const user = db.prepare('SELECT signature_path FROM users WHERE id = ?').get(userId) as
+    | { signature_path: string }
+    | undefined;
+
+  return normalizeText(user?.signature_path);
+}
+
 export function getCompanyCatalogRecord(
   db: Database.Database,
   companyId: number

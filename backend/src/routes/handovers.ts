@@ -9,12 +9,18 @@ import { convertToPdfCompatibleJpeg } from '../utils/image';
 import {
   getCompanyCatalogRecord,
   getCompanySnapshotFromBody,
+  getIssuerSignaturePath,
   getIssuerSnapshot,
   getPreparedByName,
   normalizeText,
   upsertCompanyCatalogRecord,
 } from '../utils/documentSnapshots';
 import { getUploadsDir } from '../utils/paths';
+import {
+  copySignatureSnapshot,
+  removeSignatureFile,
+  saveSignatureFromBase64,
+} from '../utils/signature';
 
 const router = Router();
 router.use(authenticate);
@@ -160,6 +166,17 @@ router.post('/', upload.array('photos', 20), async (req: Request, res: Response)
 
     const issuerSnapshot = getIssuerSnapshot(db);
     const preparedByName = getPreparedByName(db, req.user!.userId);
+    const issuerSignatureSource = getIssuerSignaturePath(db, req.user!.userId);
+    const issuerSignaturePath = copySignatureSnapshot(issuerSignatureSource, 'sig_handover_issuer');
+
+    let clientSignaturePath = '';
+    try {
+      const saved = saveSignatureFromBase64(req.body?.client_signature_base64, 'sig_handover_client');
+      if (saved) clientSignaturePath = saved;
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+      return;
+    }
 
     let trailerId = existingTrailerId ? Number(existingTrailerId) : null;
     if (!trailerId) {
@@ -194,6 +211,8 @@ router.post('/', upload.array('photos', 20), async (req: Request, res: Response)
     ).get(trailerId) as { id: number; registration_number: string } | undefined;
 
     if (activeHandover) {
+      removeSignatureFile(issuerSignaturePath);
+      removeSignatureFile(clientSignaturePath);
       res.status(409).json({
         error: `Trailer ${activeHandover.registration_number} is already handed over and must be returned first`,
       });
@@ -206,9 +225,10 @@ router.post('/', upload.array('photos', 20), async (req: Request, res: Response)
         company_name, company_address_line1, company_address_line2, company_postal_code,
         company_tax_id, company_phone, company_email, company_contact,
         issuer_name, issuer_address, issuer_tax_id, issuer_phone, issuer_email, prepared_by_name,
-        handover_date, handover_time, equipment_notes, has_documents, beams_count, straps_count
+        handover_date, handover_time, equipment_notes, has_documents, beams_count, straps_count,
+        issuer_signature_path, client_signature_path
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       companyId,
       trailerId,
@@ -233,6 +253,8 @@ router.post('/', upload.array('photos', 20), async (req: Request, res: Response)
       has_documents === '1' || has_documents === 'true' ? 1 : 0,
       Number(beams_count) || 0,
       Number(straps_count) || 0,
+      issuerSignaturePath,
+      clientSignaturePath,
     );
     const handoverId = Number(handoverResult.lastInsertRowid);
 
@@ -343,11 +365,18 @@ router.patch('/:id', requireAdmin, upload.array('photos', 20), async (req: Reque
     }
 
     const existingHandover = db.prepare(`
-      SELECT id, company_id, trailer_id, status
+      SELECT id, company_id, trailer_id, status, issuer_signature_path, client_signature_path
       FROM handovers
       WHERE id = ?
     `).get(handoverId) as
-      | { id: number; company_id: number | null; trailer_id: number; status: 'active' | 'returned' }
+      | {
+          id: number;
+          company_id: number | null;
+          trailer_id: number;
+          status: 'active' | 'returned';
+          issuer_signature_path: string;
+          client_signature_path: string;
+        }
       | undefined;
 
     if (!existingHandover) {
@@ -385,6 +414,22 @@ router.patch('/:id', requireAdmin, upload.array('photos', 20), async (req: Reque
 
     const issuerSnapshot = getIssuerSnapshot(db);
     const preparedByName = getPreparedByName(db, req.user!.userId);
+
+    const clientSignatureClear = toBooleanFlag(req.body?.client_signature_clear);
+    let newClientSignaturePath: string | null = null;
+    let nextClientSignaturePath = existingHandover.client_signature_path || '';
+    try {
+      const saved = saveSignatureFromBase64(req.body?.client_signature_base64, 'sig_handover_client');
+      if (saved) {
+        newClientSignaturePath = saved;
+        nextClientSignaturePath = saved;
+      } else if (clientSignatureClear) {
+        nextClientSignaturePath = '';
+      }
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+      return;
+    }
 
     let trailerId = existingTrailerId ? Number(existingTrailerId) : null;
     if (!trailerId) {
@@ -510,7 +555,8 @@ router.patch('/:id', requireAdmin, upload.array('photos', 20), async (req: Reque
             equipment_notes = ?,
             has_documents = ?,
             beams_count = ?,
-            straps_count = ?
+            straps_count = ?,
+            client_signature_path = ?
         WHERE id = ?
       `).run(
         companyId,
@@ -535,6 +581,7 @@ router.patch('/:id', requireAdmin, upload.array('photos', 20), async (req: Reque
         has_documents === '1' || has_documents === 'true' ? 1 : 0,
         Number(beams_count) || 0,
         Number(straps_count) || 0,
+        nextClientSignaturePath,
         handoverId
       );
 
@@ -588,7 +635,14 @@ router.patch('/:id', requireAdmin, upload.array('photos', 20), async (req: Reque
       }
     }
 
-    res.json({ id: handoverId, message: 'Handover updated' });
+    if (
+      existingHandover.client_signature_path
+      && existingHandover.client_signature_path !== nextClientSignaturePath
+    ) {
+      removeSignatureFile(existingHandover.client_signature_path);
+    }
+
+    res.json({ id: handoverId, message: 'Handover updated', client_signature_path: nextClientSignaturePath || null });
   } catch (err) {
     console.error('Update handover error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -604,7 +658,11 @@ router.delete('/:id', requireAdmin, (req: Request, res: Response) => {
       return;
     }
 
-    const handover = db.prepare('SELECT id FROM handovers WHERE id = ?').get(handoverId);
+    const handover = db.prepare(
+      'SELECT id, issuer_signature_path, client_signature_path FROM handovers WHERE id = ?'
+    ).get(handoverId) as
+      | { id: number; issuer_signature_path: string; client_signature_path: string }
+      | undefined;
     if (!handover) {
       res.status(404).json({ error: 'Handover not found' });
       return;
@@ -619,6 +677,9 @@ router.delete('/:id', requireAdmin, (req: Request, res: Response) => {
       JOIN returns r ON r.id = rp.return_id
       WHERE r.handover_id = ?
     `).all(handoverId) as Array<{ file_path: string }>;
+    const relatedReturns = db.prepare(
+      'SELECT issuer_signature_path, client_signature_path FROM returns WHERE handover_id = ?'
+    ).all(handoverId) as Array<{ issuer_signature_path: string; client_signature_path: string }>;
 
     const removeData = db.transaction(() => {
       db.prepare(
@@ -640,6 +701,13 @@ router.delete('/:id', requireAdmin, (req: Request, res: Response) => {
           console.warn('[handovers] Failed to remove photo file:', filePath, err);
         }
       }
+    }
+
+    removeSignatureFile(handover.issuer_signature_path);
+    removeSignatureFile(handover.client_signature_path);
+    for (const r of relatedReturns) {
+      removeSignatureFile(r.issuer_signature_path);
+      removeSignatureFile(r.client_signature_path);
     }
 
     res.json({ message: 'Handover deleted' });

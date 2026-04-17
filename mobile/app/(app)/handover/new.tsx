@@ -1,8 +1,23 @@
-import { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView,
   Alert, ActivityIndicator, Platform, Switch,
 } from 'react-native';
+import {
+  KeyboardAwareScrollView,
+  KeyboardAvoidingView,
+} from '../../../utils/keyboardController';
+
+const ScrollContainer: React.ComponentType<any> = KeyboardAwareScrollView;
+
+const KeyboardWrapper: React.ComponentType<{ style?: any; children?: React.ReactNode }> = ({
+  children,
+  style,
+}) => (
+  <KeyboardAvoidingView style={style} behavior="padding">
+    {children}
+  </KeyboardAvoidingView>
+);
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,6 +26,7 @@ import { Colors, Spacing, FontSize, BorderRadius } from '../../../constants/them
 import CompanyLookup from '../../../components/CompanyLookup';
 import TrailerTemplate, { PhotoPosition, ZonePhoto, REQUIRED_POSITIONS } from '../../../components/TrailerTemplate';
 import PhotoCapture from '../../../components/PhotoCapture';
+import ClientSignatureField from '../../../components/ClientSignatureField';
 import { useCompanyLookup } from '../../../hooks/useCompanyLookup';
 import { CompanyItem } from '../../../types/company';
 import { showPlatformAlert } from '../../../utils/showPlatformAlert';
@@ -87,6 +103,7 @@ export default function NewHandoverScreen() {
   const [beamsCount, setBeamsCount] = useState('');
   const [strapsCount, setStrapsCount] = useState('');
   const [equipmentNotes, setEquipmentNotes] = useState('');
+  const [clientSignature, setClientSignature] = useState<string | null>(null);
 
   // Photos
   const [photos, setPhotos] = useState<Record<string, ZonePhoto | undefined>>({});
@@ -391,6 +408,9 @@ export default function NewHandoverScreen() {
       formData.append('has_documents', hasDocuments ? '1' : '0');
       formData.append('beams_count', beamsCount || '0');
       formData.append('straps_count', strapsCount || '0');
+      if (clientSignature) {
+        formData.append('client_signature_base64', clientSignature);
+      }
 
       for (const photo of photoEntries) {
         if (photo.isPreloaded && photo.preloadedFilePath) {
@@ -440,7 +460,7 @@ export default function NewHandoverScreen() {
   };
 
   const renderCompanyStep = () => (
-    <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+    <ScrollContainer contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" bottomOffset={Spacing.lg}>
       <Text style={styles.sectionTitle}>{t('handover.company')}</Text>
 
       <CompanyLookup
@@ -531,14 +551,14 @@ export default function NewHandoverScreen() {
           </View>
         </>
       ) : null}
-    </ScrollView>
+    </ScrollContainer>
   );
 
   const renderTrailerStep = () => {
     const isFromDb = !!selectedTrailer;
 
     return (
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+      <ScrollContainer contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" bottomOffset={Spacing.lg}>
         <Text style={styles.sectionTitle}>{t('handover.trailer')}</Text>
 
         <Text style={styles.label}>{t('handover.registrationNumber')} *</Text>
@@ -752,7 +772,7 @@ export default function NewHandoverScreen() {
         <TextInput style={[styles.input, styles.textArea]} value={equipmentNotes}
           onChangeText={setEquipmentNotes} placeholder={t('handover.equipmentNotes')}
           placeholderTextColor={Colors.gray400} multiline numberOfLines={4} />
-      </ScrollView>
+      </ScrollContainer>
     );
   };
 
@@ -844,6 +864,13 @@ export default function NewHandoverScreen() {
             ))}
           </>
         )}
+
+        <View style={{ marginTop: Spacing.lg }}>
+          <ClientSignatureField
+            signatureBase64={clientSignature}
+            onChange={setClientSignature}
+          />
+        </View>
       </ScrollView>
     );
   };
@@ -852,7 +879,7 @@ export default function NewHandoverScreen() {
   const stepLabels = [t('handover.company'), t('handover.trailer'), t('handover.photos'), t('handover.summary')];
 
   return (
-    <View style={styles.container}>
+    <KeyboardWrapper style={styles.container}>
       {/* Progress */}
       <View style={styles.progress}>
         {stepLabels.map((label, i) => (
@@ -962,7 +989,7 @@ export default function NewHandoverScreen() {
           showIssueFields
         />
       )}
-    </View>
+    </KeyboardWrapper>
   );
 }
 

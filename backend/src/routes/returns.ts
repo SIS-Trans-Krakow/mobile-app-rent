@@ -5,8 +5,17 @@ import { v4 as uuidv4 } from 'uuid';
 import { getDb } from '../database/schema';
 import { authenticate } from '../middleware/auth';
 import { convertToPdfCompatibleJpeg } from '../utils/image';
-import { getIssuerSnapshot, getPreparedByName } from '../utils/documentSnapshots';
+import {
+  getIssuerSignaturePath,
+  getIssuerSnapshot,
+  getPreparedByName,
+} from '../utils/documentSnapshots';
 import { getUploadsDir } from '../utils/paths';
+import {
+  copySignatureSnapshot,
+  removeSignatureFile,
+  saveSignatureFromBase64,
+} from '../utils/signature';
 
 const router = Router();
 router.use(authenticate);
@@ -115,6 +124,18 @@ router.post('/', upload.array('photos', 20), async (req: Request, res: Response)
 
     const issuerSnapshot = getIssuerSnapshot(db);
     const preparedByName = getPreparedByName(db, req.user!.userId);
+    const issuerSignatureSource = getIssuerSignaturePath(db, req.user!.userId);
+    const issuerSignaturePath = copySignatureSnapshot(issuerSignatureSource, 'sig_return_issuer');
+
+    let clientSignaturePath = '';
+    try {
+      const saved = saveSignatureFromBase64(req.body?.client_signature_base64, 'sig_return_client');
+      if (saved) clientSignaturePath = saved;
+    } catch (err) {
+      removeSignatureFile(issuerSignaturePath);
+      res.status(400).json({ error: (err as Error).message });
+      return;
+    }
 
     const files = (req.files as Express.Multer.File[]) || [];
     const positions = Array.isArray(photo_positions) ? photo_positions : photo_positions ? [photo_positions] : [];
@@ -188,9 +209,10 @@ router.post('/', upload.array('photos', 20), async (req: Request, res: Response)
         company_name, company_address_line1, company_address_line2, company_postal_code,
         company_tax_id, company_phone, company_email, company_contact,
         issuer_name, issuer_address, issuer_tax_id, issuer_phone, issuer_email, prepared_by_name,
-        return_date, return_time, notes, return_has_documents, return_beams_count, return_straps_count
+        return_date, return_time, notes, return_has_documents, return_beams_count, return_straps_count,
+        issuer_signature_path, client_signature_path
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       Number(handover_id),
       req.user!.userId,
@@ -214,6 +236,8 @@ router.post('/', upload.array('photos', 20), async (req: Request, res: Response)
       return_has_documents === '1' || return_has_documents === 'true' ? 1 : 0,
       Number(return_beams_count) || 0,
       Number(return_straps_count) || 0,
+      issuerSignaturePath,
+      clientSignaturePath,
     );
     const returnId = Number(returnResult.lastInsertRowid);
 

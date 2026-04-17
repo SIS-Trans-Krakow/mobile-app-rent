@@ -5,11 +5,13 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  ScrollView,
   Alert,
   ActivityIndicator,
   Platform,
 } from 'react-native';
+import { KeyboardAwareScrollView } from '../../../utils/keyboardController';
+
+const ScrollContainer: React.ComponentType<any> = KeyboardAwareScrollView;
 import { useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import api from '../../../services/api';
@@ -95,7 +97,7 @@ export default function CompanyProfileScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollContainer style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" bottomOffset={Spacing.lg}>
       <Text style={styles.sectionDescription}>{t('admin.companyProfileHelper')}</Text>
 
       <Text style={styles.label}>{t('admin.companyName')}</Text>
@@ -155,7 +157,7 @@ export default function CompanyProfileScreen() {
           <Text style={styles.saveBtnText}>{t('common.save')}</Text>
         )}
       </TouchableOpacity>
-    </ScrollView>
+    </ScrollContainer>
   );
 }
 

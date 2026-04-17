@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
 import {
-  View, Text, TextInput, ScrollView, StyleSheet, ActivityIndicator,
+  View, Text, TextInput, StyleSheet, ActivityIndicator,
   TouchableOpacity, Alert, Platform, Linking, Image, Switch,
 } from 'react-native';
+import { KeyboardAwareScrollView } from '../../../utils/keyboardController';
+
+const ScrollContainer: React.ComponentType<any> = KeyboardAwareScrollView;
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,6 +14,7 @@ import { Colors, Spacing, FontSize, BorderRadius } from '../../../constants/them
 import TrailerTemplate, { PhotoPosition, ZonePhoto, ALL_POSITIONS } from '../../../components/TrailerTemplate';
 import PhotoCapture from '../../../components/PhotoCapture';
 import PhotoLightbox from '../../../components/PhotoLightbox';
+import ClientSignatureField from '../../../components/ClientSignatureField';
 
 const POSITION_LABELS: Record<PhotoPosition, string> = {
   'front': 'photos.front',
@@ -49,6 +53,7 @@ export default function ReturnScreen() {
 
   const [originalPhotos, setOriginalPhotos] = useState<Record<string, ZonePhoto | undefined>>({});
   const [lightboxPhoto, setLightboxPhoto] = useState<{ uri: string; label?: string; description?: string } | null>(null);
+  const [clientSignature, setClientSignature] = useState<string | null>(null);
 
   useEffect(() => {
     loadHandover();
@@ -109,6 +114,9 @@ export default function ReturnScreen() {
       formData.append('return_has_documents', returnHasDocuments ? '1' : '0');
       formData.append('return_beams_count', returnBeamsCount || '0');
       formData.append('return_straps_count', returnStrapsCount || '0');
+      if (clientSignature) {
+        formData.append('client_signature_base64', clientSignature);
+      }
 
       const photoEntries = Object.values(returnPhotos).filter(Boolean) as ZonePhoto[];
       for (const photo of photoEntries) {
@@ -195,7 +203,7 @@ export default function ReturnScreen() {
       : t('return.submitReturn');
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollContainer style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" bottomOffset={Spacing.lg}>
       {/* Handover summary */}
       <View style={styles.summary}>
         <Text style={styles.summaryTitle}>{handover.company_name}</Text>
@@ -430,6 +438,13 @@ export default function ReturnScreen() {
         onZonePress={handleZonePress}
       />
 
+      <View style={{ marginTop: Spacing.md }}>
+        <ClientSignatureField
+          signatureBase64={clientSignature}
+          onChange={setClientSignature}
+        />
+      </View>
+
       {/* Submit */}
       <TouchableOpacity
         style={[
@@ -478,7 +493,7 @@ export default function ReturnScreen() {
         description={lightboxPhoto?.description}
         onClose={() => setLightboxPhoto(null)}
       />
-    </ScrollView>
+    </ScrollContainer>
   );
 }
 

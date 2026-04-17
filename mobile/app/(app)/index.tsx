@@ -30,6 +30,13 @@ export default function DashboardScreen() {
           <TouchableOpacity onPress={toggleLang} style={styles.iconBtn}>
             <Text style={{ fontSize: 18 }}>{i18n.language === 'pl' ? '🇬🇧' : '🇵🇱'}</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => router.push('/(app)/profile')}
+            style={styles.iconBtn}
+            accessibilityLabel={t('profile.menuLabel')}
+          >
+            <Ionicons name="person-circle-outline" size={22} color={Colors.gray600} />
+          </TouchableOpacity>
           <TouchableOpacity onPress={handleLogout} style={styles.iconBtn}>
             <Ionicons name="log-out-outline" size={20} color={Colors.gray500} />
           </TouchableOpacity>

@@ -32,6 +32,9 @@ export function getDb(): Database.Database {
     migrateHandoverPhotosIssueFields(db);
     migrateReturnPhotosDeltaFields(db);
     migrateDocumentSnapshotTables(db);
+    migrateUsersSignatureField(db);
+    migrateHandoversSignatureFields(db);
+    migrateReturnsSignatureFields(db);
   }
   return db;
 }
@@ -91,6 +94,7 @@ function initSchema(db: Database.Database): void {
       full_name TEXT NOT NULL,
       role TEXT NOT NULL DEFAULT 'user' CHECK(role IN ('admin', 'user')),
       active INTEGER NOT NULL DEFAULT 1,
+      signature_path TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -150,6 +154,8 @@ function initSchema(db: Database.Database): void {
       has_documents INTEGER NOT NULL DEFAULT 0,
       beams_count INTEGER NOT NULL DEFAULT 0,
       straps_count INTEGER NOT NULL DEFAULT 0,
+      issuer_signature_path TEXT NOT NULL DEFAULT '',
+      client_signature_path TEXT NOT NULL DEFAULT '',
       status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'returned')),
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (company_id) REFERENCES companies(id),
@@ -191,6 +197,8 @@ function initSchema(db: Database.Database): void {
       return_has_documents INTEGER NOT NULL DEFAULT 0,
       return_beams_count INTEGER NOT NULL DEFAULT 0,
       return_straps_count INTEGER NOT NULL DEFAULT 0,
+      issuer_signature_path TEXT NOT NULL DEFAULT '',
+      client_signature_path TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (handover_id) REFERENCES handovers(id),
       FOREIGN KEY (created_by) REFERENCES users(id)
@@ -622,4 +630,44 @@ function migrateReturnsSnapshotTable(db: Database.Database): void {
   migrate();
   db.pragma('foreign_keys = ON');
   console.log('[db] returns snapshot migration complete.');
+}
+
+function migrateUsersSignatureField(db: Database.Database): void {
+  const columns = db.prepare('PRAGMA table_info(users)').all() as Array<{ name: string }>;
+  const names = columns.map((c) => c.name);
+  if (!names.includes('signature_path')) {
+    db.exec("ALTER TABLE users ADD COLUMN signature_path TEXT NOT NULL DEFAULT ''");
+    console.log('[db] users: added signature_path');
+  }
+}
+
+function migrateHandoversSignatureFields(db: Database.Database): void {
+  const columns = db.prepare('PRAGMA table_info(handovers)').all() as Array<{ name: string }>;
+  const names = columns.map((c) => c.name);
+  if (!names.includes('issuer_signature_path')) {
+    db.exec("ALTER TABLE handovers ADD COLUMN issuer_signature_path TEXT NOT NULL DEFAULT ''");
+    console.log('[db] handovers: added issuer_signature_path');
+  }
+  if (!names.includes('client_signature_path')) {
+    db.exec("ALTER TABLE handovers ADD COLUMN client_signature_path TEXT NOT NULL DEFAULT ''");
+    console.log('[db] handovers: added client_signature_path');
+  }
+}
+
+function migrateReturnsSignatureFields(db: Database.Database): void {
+  const tableExists = db.prepare(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='returns'"
+  ).get();
+  if (!tableExists) return;
+
+  const columns = db.prepare('PRAGMA table_info(returns)').all() as Array<{ name: string }>;
+  const names = columns.map((c) => c.name);
+  if (!names.includes('issuer_signature_path')) {
+    db.exec("ALTER TABLE returns ADD COLUMN issuer_signature_path TEXT NOT NULL DEFAULT ''");
+    console.log('[db] returns: added issuer_signature_path');
+  }
+  if (!names.includes('client_signature_path')) {
+    db.exec("ALTER TABLE returns ADD COLUMN client_signature_path TEXT NOT NULL DEFAULT ''");
+    console.log('[db] returns: added client_signature_path');
+  }
 }

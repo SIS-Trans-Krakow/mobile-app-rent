@@ -92,6 +92,8 @@ interface HandoverData {
   production_date: string;
   created_by_name: string;
   photos: HandoverPhoto[];
+  issuer_signature_path?: string;
+  client_signature_path?: string;
 }
 
 interface ReturnData {
@@ -104,6 +106,8 @@ interface ReturnData {
   return_straps_count: number;
   created_by_name: string;
   photos: HandoverPhoto[];
+  issuer_signature_path?: string;
+  client_signature_path?: string;
 }
 
 interface IssuerCompanyProfile {
@@ -753,28 +757,73 @@ function drawDamageSchema(
   return y + sectionHeight;
 }
 
-function drawSignatureSection(doc: PDFKit.PDFDocument, y: number): number {
+function drawSignatureSection(
+  doc: PDFKit.PDFDocument,
+  y: number,
+  signatures?: {
+    issuerSignaturePath?: string | null;
+    clientSignaturePath?: string | null;
+  }
+): number {
   const x = doc.page.margins.left;
   const width = getContentWidth(doc);
   const gap = 20;
   const cardWidth = (width - gap) / 2;
-  const cardHeight = 96;
+  const cardHeight = 130;
 
   y = ensurePageSpace(doc, y, cardHeight + 30);
   y = drawSectionHeading(doc, y, 'Podpisy / Signatures');
 
-  const titles = ['Podpis wydającego / Issuer signature', 'Podpis przyjmującego / Receiver signature'];
-  titles.forEach((title, index) => {
+  const cards = [
+    {
+      title: 'Podpis wydającego / Issuer signature',
+      filename: signatures?.issuerSignaturePath || '',
+    },
+    {
+      title: 'Podpis przyjmującego / Receiver signature',
+      filename: signatures?.clientSignaturePath || '',
+    },
+  ];
+
+  cards.forEach((card, index) => {
     const cardX = x + index * (cardWidth + gap);
     doc.save();
     doc.roundedRect(cardX, y, cardWidth, cardHeight, 8).fillAndStroke('white', COLORS.borderLight);
     doc.restore();
-    doc.fontSize(10).fillColor(COLORS.text).text(title, cardX + 12, y + 12, { width: cardWidth - 24, align: 'center' });
-    doc.moveTo(cardX + 18, y + 72).lineTo(cardX + cardWidth - 18, y + 72).strokeColor(COLORS.borderLight).lineWidth(1).stroke();
-    doc.fontSize(8).fillColor(COLORS.muted).text('Miejsce na podpis odręczny / Space for handwritten signature', cardX + 12, y + 78, {
+    doc.fontSize(10).fillColor(COLORS.text).text(card.title, cardX + 12, y + 10, {
       width: cardWidth - 24,
       align: 'center',
     });
+
+    const lineY = y + cardHeight - 24;
+    const imgAreaY = y + 28;
+    const imgAreaH = lineY - imgAreaY - 4;
+    const imgAreaW = cardWidth - 32;
+    const imgAreaX = cardX + 16;
+
+    const filePath = card.filename ? path.join(getUploadsDir(), card.filename) : '';
+    if (filePath && fs.existsSync(filePath)) {
+      try {
+        doc.image(filePath, imgAreaX, imgAreaY, {
+          fit: [imgAreaW, imgAreaH],
+          align: 'center',
+          valign: 'center',
+        });
+      } catch (err) {
+        console.warn('[pdf] Failed to draw signature image:', filePath, (err as Error).message);
+      }
+    }
+
+    doc.moveTo(cardX + 18, lineY).lineTo(cardX + cardWidth - 18, lineY)
+      .strokeColor(COLORS.borderLight).lineWidth(1).stroke();
+    doc.fontSize(8).fillColor(COLORS.muted).text(
+      card.filename
+        ? 'Podpis cyfrowy / Digital signature'
+        : 'Miejsce na podpis odręczny / Space for handwritten signature',
+      cardX + 12,
+      lineY + 4,
+      { width: cardWidth - 24, align: 'center' }
+    );
   });
 
   doc.fillColor(COLORS.text);
@@ -949,7 +998,10 @@ export function generateHandoverPdf(
   y = doc.page.margins.top;
   y = drawDamageSchema(doc, y, issueGroups);
   y += 12;
-  y = drawSignatureSection(doc, y);
+  y = drawSignatureSection(doc, y, {
+    issuerSignaturePath: data.issuer_signature_path,
+    clientSignaturePath: data.client_signature_path,
+  });
 
   if ((data.photos || []).length > 0) {
     doc.addPage();
@@ -1127,7 +1179,10 @@ export function generateReturnPdf(
     ],
   });
   y += 12;
-  y = drawSignatureSection(doc, y);
+  y = drawSignatureSection(doc, y, {
+    issuerSignaturePath: returnData.issuer_signature_path,
+    clientSignaturePath: returnData.client_signature_path,
+  });
 
   const allPositions = new Set([
     ...handoverData.photos.map((p) => p.position_on_template),

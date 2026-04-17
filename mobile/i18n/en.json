@@ -183,6 +183,38 @@
     "changePhoto": "Change",
     "fillMissingPhotos": "Fill missing photos"
   },
+  "signature": {
+    "addClientSignature": "Digital handwritten signature",
+    "clientSignatureTitle": "Client signature",
+    "clientSignatureSaved": "Client signature added",
+    "change": "Change signature",
+    "remove": "Remove signature",
+    "padTitle": "Sign here",
+    "padHint": "Sign with your finger or stylus in the field below",
+    "clear": "Clear",
+    "save": "Save signature",
+    "cancel": "Cancel",
+    "empty": "Signature pad is empty",
+    "errorSaving": "Failed to save signature",
+    "preview": "Signature preview",
+    "optional": "Optional — sign if you want to attach a handwritten signature to the PDF"
+  },
+  "profile": {
+    "title": "My profile",
+    "menuLabel": "My profile",
+    "signatureSection": "My signature (issuer)",
+    "signatureDescription": "Your signature will be automatically inserted into generated PDF documents as the issuer signature.",
+    "signaturePresent": "Signature set",
+    "signatureMissing": "No signature",
+    "drawSignature": "Draw signature in app",
+    "uploadPng": "Upload PNG file",
+    "removeSignature": "Remove signature",
+    "signatureUpdated": "Signature updated",
+    "signatureRemoved": "Signature removed",
+    "uploadInvalid": "File must be in PNG format",
+    "loadError": "Failed to load signature",
+    "saveError": "Failed to save signature"
+  },
   "admin": {
     "users": "Users",
     "clients": "Clients",

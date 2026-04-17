@@ -9,6 +9,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, FontSize, BorderRadius } from '../constants/theme';
 import { PhotoPosition, ZonePhoto } from './TrailerTemplate';
 import { showPlatformAlert } from '../utils/showPlatformAlert';
+import { KeyboardAwareScrollView } from '../utils/keyboardController';
+
+const ScrollContainer: React.ComponentType<any> = KeyboardAwareScrollView;
 
 const POSITION_LABELS: Record<PhotoPosition, string> = {
   'front': 'photos.front',
@@ -174,6 +177,12 @@ export default function PhotoCapture({
           </TouchableOpacity>
         </View>
 
+        <ScrollContainer
+          style={styles.scrollArea}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          bottomOffset={Spacing.lg}
+        >
         {Platform.OS === 'web' && errorMessage ? (
           <View style={styles.errorBanner}>
             <Text style={styles.errorText}>{errorMessage}</Text>
@@ -264,6 +273,7 @@ export default function PhotoCapture({
             )}
           </View>
         )}
+        </ScrollContainer>
       </View>
     </Modal>
   );
@@ -271,6 +281,8 @@ export default function PhotoCapture({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  scrollArea: { flex: 1 },
+  scrollContent: { paddingBottom: Spacing.xl },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',

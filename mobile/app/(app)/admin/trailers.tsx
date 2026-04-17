@@ -1,8 +1,11 @@
 import { useState, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList,
-  Alert, ActivityIndicator, Modal, ScrollView, Platform,
+  Alert, ActivityIndicator, Modal, Platform,
 } from 'react-native';
+import { KeyboardAwareScrollView } from '../../../utils/keyboardController';
+
+const ScrollContainer: React.ComponentType<any> = KeyboardAwareScrollView;
 import { useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
@@ -247,7 +250,7 @@ export default function TrailersScreen() {
             <View style={{ width: 28 }} />
           </View>
 
-          <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
+          <ScrollContainer style={styles.modalBody} keyboardShouldPersistTaps="handled" bottomOffset={Spacing.lg}>
             <Text style={styles.label}>{t('admin.registrationNumber')} *</Text>
             <TextInput
               style={styles.input}
@@ -310,7 +313,7 @@ export default function TrailersScreen() {
                 <Text style={styles.saveBtnText}>{t('common.save')}</Text>
               )}
             </TouchableOpacity>
-          </ScrollView>
+          </ScrollContainer>
         </View>
       </Modal>
     </View>

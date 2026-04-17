@@ -93,6 +93,13 @@ export default function AppLayout() {
           href: user?.role === 'admin' ? '/(app)/admin' : null,
         }}
       />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          href: null,
+          headerShown: false,
+        }}
+      />
     </Tabs>
   );
 }

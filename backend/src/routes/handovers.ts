@@ -53,9 +53,12 @@ function getHandoverSelectSql(whereClause = ''): string {
              SELECT COUNT(*)
              FROM handover_photos hp
              WHERE hp.handover_id = h.id AND hp.has_issue = 1
-           ) AS issue_count
+           ) AS issue_count,
+           r.return_date AS return_date,
+           r.return_time AS return_time
     FROM handovers h
     JOIN trailers t ON h.trailer_id = t.id
+    LEFT JOIN returns r ON r.handover_id = h.id
     ${whereClause}
   `;
 }

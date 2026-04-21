@@ -2,6 +2,7 @@ import PDFDocument from 'pdfkit';
 import path from 'path';
 import fs from 'fs';
 import { getUploadsDir } from '../utils/paths';
+import { calculateRentalFullDays } from '../utils/rentalDuration';
 
 const FONT_CANDIDATES = [
   path.join(__dirname, '..', '..', 'assets', 'fonts', 'DejaVuSans.ttf'),
@@ -432,10 +433,16 @@ function drawMetaRow(doc: PDFKit.PDFDocument, y: number, data: HandoverData): nu
   return y + height;
 }
 
-function drawReturnMetaRow(doc: PDFKit.PDFDocument, y: number, returnData: ReturnData, handoverId: number): number {
+function drawReturnMetaRow(
+  doc: PDFKit.PDFDocument,
+  y: number,
+  returnData: ReturnData,
+  handoverData: HandoverData
+): number {
   const x = doc.page.margins.left;
   const width = getContentWidth(doc);
-  const colWidth = width / 4;
+  const columnsCount = 3;
+  const colWidth = width / columnsCount;
   const height = 76;
   const padding = 12;
 
@@ -443,23 +450,65 @@ function drawReturnMetaRow(doc: PDFKit.PDFDocument, y: number, returnData: Retur
   doc.roundedRect(x, y, width, height, 8).fillAndStroke('white', COLORS.borderLight);
   doc.restore();
 
-  for (let col = 1; col < 4; col += 1) {
+  for (let col = 1; col < columnsCount; col += 1) {
     const lineX = x + col * colWidth;
     doc.moveTo(lineX, y).lineTo(lineX, y + height).strokeColor(COLORS.borderLight).lineWidth(1).stroke();
   }
 
-  const columns = [
-    { title: 'Numer przekazania / Handover No.', value: sanitizeText(handoverId) },
-    { title: 'Data zwrotu / Return date', value: sanitizeText(returnData.return_date) },
-    { title: 'Godzina / Time', value: sanitizeText(returnData.return_time) },
-    { title: 'Przygotował / Prepared by', value: sanitizeText(returnData.created_by_name) },
+  const rentalDays = calculateRentalFullDays(
+    handoverData.handover_date,
+    handoverData.handover_time,
+    returnData.return_date,
+    returnData.return_time,
+  );
+
+  const columns: Array<{ title: string; value: string; boldValue?: boolean }> = [
+    {
+      title: 'Data i godzina wydania / Handover date & time',
+      value:
+        [handoverData.handover_date, handoverData.handover_time]
+          .map((v) => (v != null ? String(v).trim() : ''))
+          .filter(Boolean)
+          .join(' ') || '-',
+    },
+    {
+      title: 'Czas najmu / Rental days',
+      value: rentalDays !== null ? `${rentalDays} dni / days` : '-',
+    },
+    {
+      title: 'Data i godzina zwrotu / Return date & time',
+      value:
+        [returnData.return_date, returnData.return_time]
+          .map((v) => (v != null ? String(v).trim() : ''))
+          .filter(Boolean)
+          .join(' ') || '-',
+      boldValue: true,
+    },
   ];
 
   columns.forEach((column, index) => {
     const colX = x + index * colWidth;
+    if (resolvePdfFontPath()) {
+      doc.font('main');
+    } else {
+      doc.font('Helvetica');
+    }
     doc.fontSize(8).fillColor(COLORS.muted).text(column.title, colX + padding, y + 14, { width: colWidth - padding * 2 });
+    if (column.boldValue) {
+      doc.font('Helvetica-Bold');
+    } else if (resolvePdfFontPath()) {
+      doc.font('main');
+    } else {
+      doc.font('Helvetica');
+    }
     doc.fontSize(10).fillColor(COLORS.text).text(column.value, colX + padding, y + 36, { width: colWidth - padding * 2 });
   });
+
+  if (resolvePdfFontPath()) {
+    doc.font('main');
+  } else {
+    doc.font('Helvetica');
+  }
 
   doc.fillColor(COLORS.text);
   return y + height;
@@ -763,15 +812,20 @@ function drawSignatureSection(
   signatures?: {
     issuerSignaturePath?: string | null;
     clientSignaturePath?: string | null;
+    /** Shown under issuer footer (e.g. return protocol — who prepared the document). */
+    issuerPreparedByName?: string | null;
   }
 ): number {
   const x = doc.page.margins.left;
   const width = getContentWidth(doc);
   const gap = 20;
   const cardWidth = (width - gap) / 2;
-  const cardHeight = 130;
+  const issuerPreparedBy = signatures?.issuerPreparedByName?.trim() || '';
+  const boxHeight = 130;
+  const lineY = y + boxHeight - 24;
+  const preparedByBelowGap = 8;
 
-  y = ensurePageSpace(doc, y, cardHeight + 30);
+  y = ensurePageSpace(doc, y, boxHeight + (issuerPreparedBy ? 36 : 0) + 30);
   y = drawSectionHeading(doc, y, 'Podpisy / Signatures');
 
   const cards = [
@@ -788,14 +842,13 @@ function drawSignatureSection(
   cards.forEach((card, index) => {
     const cardX = x + index * (cardWidth + gap);
     doc.save();
-    doc.roundedRect(cardX, y, cardWidth, cardHeight, 8).fillAndStroke('white', COLORS.borderLight);
+    doc.roundedRect(cardX, y, cardWidth, boxHeight, 8).fillAndStroke('white', COLORS.borderLight);
     doc.restore();
     doc.fontSize(10).fillColor(COLORS.text).text(card.title, cardX + 12, y + 10, {
       width: cardWidth - 24,
       align: 'center',
     });
 
-    const lineY = y + cardHeight - 24;
     const imgAreaY = y + 28;
     const imgAreaH = lineY - imgAreaY - 4;
     const imgAreaW = cardWidth - 32;
@@ -826,8 +879,21 @@ function drawSignatureSection(
     );
   });
 
+  let sectionBottom = y + boxHeight;
+  if (issuerPreparedBy) {
+    const issuerCardX = x;
+    const preparedY = y + boxHeight + preparedByBelowGap;
+    doc.fontSize(7.5).fillColor(COLORS.muted).text(
+      `Przygotował / Prepared by: ${sanitizeText(issuerPreparedBy)}`,
+      issuerCardX,
+      preparedY,
+      { width: cardWidth, align: 'center' }
+    );
+    sectionBottom = Math.max(sectionBottom, doc.y + 6);
+  }
+
   doc.fillColor(COLORS.text);
-  return y + cardHeight;
+  return sectionBottom;
 }
 
 function drawPhotoGallery(
@@ -1128,7 +1194,7 @@ export function generateReturnPdf(
   y = participantsBottom + 12;
 
   y = ensurePageSpace(doc, y, 180);
-  y = drawReturnMetaRow(doc, y, returnData, handoverData.id);
+  y = drawReturnMetaRow(doc, y, returnData, handoverData);
   y += 12;
   y = drawReturnEquipmentComparisonRow(doc, y, handoverData, returnData);
   y += 12;
@@ -1182,6 +1248,7 @@ export function generateReturnPdf(
   y = drawSignatureSection(doc, y, {
     issuerSignaturePath: returnData.issuer_signature_path,
     clientSignaturePath: returnData.client_signature_path,
+    issuerPreparedByName: returnData.created_by_name,
   });
 
   const allPositions = new Set([

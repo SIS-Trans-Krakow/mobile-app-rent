@@ -15,6 +15,7 @@ import TrailerTemplate, { PhotoPosition, ZonePhoto, ALL_POSITIONS } from '../../
 import PhotoCapture from '../../../components/PhotoCapture';
 import PhotoLightbox from '../../../components/PhotoLightbox';
 import ClientSignatureField from '../../../components/ClientSignatureField';
+import { calculateRentalFullDays } from '../../../utils/rentalDuration';
 
 const POSITION_LABELS: Record<PhotoPosition, string> = {
   'front': 'photos.front',
@@ -224,6 +225,26 @@ export default function ReturnScreen() {
         <Text style={styles.label}>{t('return.time')}</Text>
         <TextInput style={styles.input} value={returnTime} onChangeText={setReturnTime}
           placeholder="HH:MM" placeholderTextColor={Colors.gray400} />
+
+        {(() => {
+          const days = calculateRentalFullDays(
+            handover?.handover_date,
+            handover?.handover_time,
+            returnDate,
+            returnTime,
+          );
+          return (
+            <View style={styles.rentalDurationBox}>
+              <Ionicons name="time-outline" size={14} color={Colors.primary} />
+              <Text style={styles.rentalDurationText}>
+                {t('return.rentalDuration')}:{' '}
+                {days !== null
+                  ? t('return.rentalDurationDays', { count: days })
+                  : t('return.rentalDurationUnparseable')}
+              </Text>
+            </View>
+          );
+        })()}
 
         <Text style={styles.label}>{t('return.notes')}</Text>
         <TextInput style={[styles.input, styles.textArea]} value={notes} onChangeText={setNotes}
@@ -563,6 +584,23 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginBottom: Spacing.sm,
     fontStyle: 'italic',
+  },
+  rentalDurationBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    borderRadius: BorderRadius.sm,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    marginTop: Spacing.sm,
+  },
+  rentalDurationText: {
+    fontSize: FontSize.sm,
+    color: Colors.primary,
+    fontWeight: '600',
   },
   comparisonCard: {
     backgroundColor: Colors.white,

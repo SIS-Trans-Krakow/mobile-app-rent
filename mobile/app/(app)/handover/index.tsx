@@ -8,16 +8,35 @@ import { Ionicons } from '@expo/vector-icons';
 import api from '../../../services/api';
 import { useConnectivityStore } from '../../../stores/connectivity';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../../constants/theme';
+import { calculateRentalFullDays, calculateRentalFullDaysElapsed } from '../../../utils/rentalDuration';
 
 interface HandoverItem {
   id: number;
   handover_date: string;
   handover_time: string;
+  return_date?: string | null;
+  return_time?: string | null;
   company_name: string;
   registration_number: string;
   trailer_type: string;
   status: string;
   issue_count?: number;
+}
+
+function getListRentalDayCount(item: HandoverItem): number | null {
+  const st = String(item.status ?? '').trim().toLowerCase();
+  if (st === 'active') {
+    return calculateRentalFullDaysElapsed(item.handover_date, item.handover_time);
+  }
+  if (st === 'returned') {
+    return calculateRentalFullDays(
+      item.handover_date,
+      item.handover_time,
+      item.return_date ?? null,
+      item.return_time ?? null,
+    );
+  }
+  return null;
 }
 
 type StatusFilter = 'all' | 'active' | 'returned';
@@ -43,7 +62,16 @@ export default function HandoverListScreen() {
     try {
       setLoadError(false);
       const res = await api.get('/handovers');
-      setHandovers(res.data);
+      const rows = (res.data as Record<string, unknown>[]).map((h) => {
+        const raw = h as Record<string, unknown>;
+        return {
+          ...raw,
+          status: String(raw.status ?? '').trim().toLowerCase(),
+          return_date: (raw.return_date ?? raw.returnDate ?? null) as string | null | undefined,
+          return_time: (raw.return_time ?? raw.returnTime ?? null) as string | null | undefined,
+        } as HandoverItem;
+      });
+      setHandovers(rows);
     } catch (err) {
       console.error('Load handovers error:', err);
       setLoadError(true);
@@ -54,7 +82,8 @@ export default function HandoverListScreen() {
 
   const normalizedQuery = registrationQuery.trim().toUpperCase();
   const filteredHandovers = handovers.filter((item) => {
-    const matchesStatus = statusFilter === 'all' || item.status === statusFilter;
+    const st = String(item.status ?? '').trim().toLowerCase();
+    const matchesStatus = statusFilter === 'all' || st === statusFilter;
     const matchesRegistration = !normalizedQuery
       || item.registration_number.toUpperCase().includes(normalizedQuery);
 
@@ -144,45 +173,84 @@ export default function HandoverListScreen() {
             <Text style={styles.empty}>{t('common.noData')}</Text>
           )
         }
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.card}
-            onPress={() => router.push(`/(app)/handover/${item.id}`)}
-          >
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardId}>#{item.id}</Text>
-              <View style={styles.cardHeaderRight}>
-                {item.issue_count ? (
-                  <View style={styles.issueBadge}>
-                    <Ionicons name="warning" size={12} color={Colors.white} />
-                    <Text style={styles.issueBadgeText}>{item.issue_count}</Text>
+        renderItem={({ item }) => {
+          const rentalDays = getListRentalDayCount(item);
+          const isReturned = String(item.status ?? '').trim().toLowerCase() === 'returned';
+          const returnWhen = [item.return_date, item.return_time]
+            .map((v) => (v != null ? String(v).trim() : ''))
+            .filter(Boolean)
+            .join(' ');
+          return (
+            <TouchableOpacity
+              style={styles.card}
+              onPress={() => router.push(`/(app)/handover/${item.id}`)}
+            >
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardId}>#{item.id}</Text>
+                <View style={styles.cardHeaderRight}>
+                  {item.issue_count ? (
+                    <View style={styles.issueBadge}>
+                      <Ionicons name="warning" size={12} color={Colors.white} />
+                      <Text style={styles.issueBadgeText}>{item.issue_count}</Text>
+                    </View>
+                  ) : null}
+                  <View style={[
+                    styles.badge,
+                    String(item.status ?? '').trim().toLowerCase() === 'active'
+                      ? styles.badgeActive
+                      : styles.badgeReturned,
+                  ]}>
+                    <Text style={styles.badgeText}>
+                      {String(item.status ?? '').trim().toLowerCase() === 'active'
+                        ? t('handover.active')
+                        : t('handover.returned')}
+                    </Text>
                   </View>
-                ) : null}
-                <View style={[
-                  styles.badge,
-                  item.status === 'active' ? styles.badgeActive : styles.badgeReturned,
-                ]}>
-                  <Text style={styles.badgeText}>
-                    {item.status === 'active' ? t('handover.active') : t('handover.returned')}
-                  </Text>
                 </View>
               </View>
-            </View>
-            <Text style={styles.cardCompany}>{item.company_name}</Text>
-            <View style={styles.cardRow}>
-              <Ionicons name="car" size={14} color={Colors.gray500} />
-              <Text style={styles.cardDetail}>
-                {item.registration_number} ({item.trailer_type})
-              </Text>
-            </View>
-            <View style={styles.cardRow}>
-              <Ionicons name="calendar" size={14} color={Colors.gray500} />
-              <Text style={styles.cardDetail}>
-                {item.handover_date} {item.handover_time}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        )}
+              <Text style={styles.cardCompany}>{item.company_name}</Text>
+              <View style={styles.cardRow}>
+                <Ionicons name="car" size={14} color={Colors.gray500} />
+                <Text style={styles.cardDetail}>
+                  {item.registration_number} ({item.trailer_type})
+                </Text>
+              </View>
+              <View style={styles.cardRow}>
+                <Ionicons name="calendar" size={14} color={Colors.gray500} />
+                <Text style={styles.cardDetail}>
+                  {item.handover_date} {item.handover_time}
+                </Text>
+              </View>
+              {isReturned ? (
+                <View style={styles.cardReturnedMeta}>
+                  {returnWhen ? (
+                    <View style={styles.cardRow}>
+                      <Ionicons name="return-down-back" size={14} color={Colors.primary} />
+                      <Text style={styles.cardDetail}>{returnWhen}</Text>
+                    </View>
+                  ) : null}
+                  {rentalDays !== null ? (
+                    <View style={styles.cardRow}>
+                      <Ionicons name="time-outline" size={14} color={Colors.gray500} />
+                      <Text style={styles.cardDetail}>
+                        {t('return.rentalDuration')}: {t('return.rentalDurationDays', { count: rentalDays })}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              ) : rentalDays !== null ? (
+                <View style={styles.cardRow}>
+                  <Ionicons name="time-outline" size={14} color={Colors.gray500} />
+                  <Text style={styles.cardDetail}>
+                    {t('handover.listRentalActive', {
+                      duration: t('return.rentalDurationDays', { count: rentalDays }),
+                    })}
+                  </Text>
+                </View>
+              ) : null}
+            </TouchableOpacity>
+          );
+        }}
       />
       <TouchableOpacity
         style={styles.fab}
@@ -285,6 +353,9 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
     borderWidth: 1,
     borderColor: Colors.border,
+  },
+  cardReturnedMeta: {
+    width: '100%',
   },
   cardHeader: {
     flexDirection: 'row',

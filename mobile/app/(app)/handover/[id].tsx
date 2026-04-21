@@ -12,6 +12,7 @@ import { Colors, Spacing, FontSize, BorderRadius } from '../../../constants/them
 import TrailerTemplate, { ZonePhoto, PhotoPosition } from '../../../components/TrailerTemplate';
 import PhotoLightbox from '../../../components/PhotoLightbox';
 import { useAuthStore } from '../../../stores/auth';
+import { calculateRentalFullDays, calculateRentalFullDaysElapsed } from '../../../utils/rentalDuration';
 
 const POSITION_LABELS: Record<PhotoPosition, string> = {
   'front': 'photos.front',
@@ -166,6 +167,20 @@ export default function HandoverDetailScreen() {
     ])
   ) as PhotoPosition[];
 
+  const rentalDaysAtReturn = ret
+    ? calculateRentalFullDays(
+      handover.handover_date,
+      handover.handover_time,
+      ret.return_date,
+      ret.return_time,
+    )
+    : null;
+
+  const rentalDaysSinceHandover =
+    !ret && handover.status === 'active'
+      ? calculateRentalFullDaysElapsed(handover.handover_date, handover.handover_time)
+      : null;
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
@@ -230,6 +245,18 @@ export default function HandoverDetailScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t('handover.date')}</Text>
         <Text style={styles.value}>{handover.handover_date} {handover.handover_time}</Text>
+        {ret ? (
+          <Text style={styles.detail}>
+            {t('return.rentalDuration')}:{' '}
+            {rentalDaysAtReturn !== null
+              ? t('return.rentalDurationDays', { count: rentalDaysAtReturn })
+              : t('return.rentalDurationUnparseable')}
+          </Text>
+        ) : rentalDaysSinceHandover !== null ? (
+          <Text style={styles.detail}>
+            {t('return.rentalDurationSinceHandover')}: {t('return.rentalDurationDays', { count: rentalDaysSinceHandover })}
+          </Text>
+        ) : null}
       </View>
 
       <View style={styles.section}>
@@ -291,6 +318,12 @@ export default function HandoverDetailScreen() {
             </Text>
           </View>
           <Text style={styles.value}>{ret.return_date} {ret.return_time}</Text>
+          <Text style={styles.detail}>
+            {t('return.rentalDuration')}:{' '}
+            {rentalDaysAtReturn !== null
+              ? t('return.rentalDurationDays', { count: rentalDaysAtReturn })
+              : t('return.rentalDurationUnparseable')}
+          </Text>
           {ret.notes ? <Text style={styles.detail}>{ret.notes}</Text> : null}
           {ret.created_by_name ? (
             <Text style={styles.detail}>{t('handover.acceptedBy', { name: ret.created_by_name })}</Text>

@@ -985,6 +985,14 @@ export default function NewHandoverScreen() {
           visible={!!capturePosition}
           onClose={() => setCapturePosition(null)}
           onSave={handlePhotoSave}
+          onDelete={() => {
+            setPhotos((prev) => {
+              const next = { ...prev };
+              delete next[capturePosition];
+              return next;
+            });
+            setCapturePosition(null);
+          }}
           existingPhoto={photos[capturePosition]}
           showIssueFields
         />

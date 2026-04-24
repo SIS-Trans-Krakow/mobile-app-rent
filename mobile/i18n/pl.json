@@ -147,14 +147,17 @@
     "rearLeft": "Tył-lewo",
     "rearRight": "Tył-prawo",
     "takePhoto": "Zrób zdjęcie",
-    "pickFromGallery": "Wybierz z galerii",
+    "pickFromGallery": "Galeria",
     "description": "Opis zdjęcia",
     "tapZone": "Dotknij strefę na szablonie aby dodać zdjęcie",
     "requiredMarker": "zdjęcie obowiązkowe",
     "inheritedFromLastReturn": "↩ z ostatniego zwrotu",
     "inheritedIssue": "Uszkodzenie odziedziczone",
     "newIssue": "Nowe uszkodzenie",
-    "cameraPermissionRequired": "Wymagane uprawnienie do aparatu"
+    "cameraPermissionRequired": "Wymagane uprawnienie do aparatu",
+    "deletePhoto": "Usuń zdjęcie",
+    "deletePhotoTitle": "Usuń zdjęcie",
+    "deletePhotoConfirm": "Czy na pewno chcesz usunąć to zdjęcie?"
   },
   "return": {
     "title": "Zwrot naczepy",

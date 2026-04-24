@@ -147,14 +147,17 @@
     "rearLeft": "Rear-Left",
     "rearRight": "Rear-Right",
     "takePhoto": "Take Photo",
-    "pickFromGallery": "Pick from Gallery",
+    "pickFromGallery": "Gallery",
     "description": "Photo description",
     "tapZone": "Tap a zone on the template to add a photo",
     "requiredMarker": "required photo",
     "inheritedFromLastReturn": "↩ from last return",
     "inheritedIssue": "Inherited issue",
     "newIssue": "New issue",
-    "cameraPermissionRequired": "Camera permission required"
+    "cameraPermissionRequired": "Camera permission required",
+    "deletePhoto": "Delete Photo",
+    "deletePhotoTitle": "Delete Photo",
+    "deletePhotoConfirm": "Are you sure you want to delete this photo?"
   },
   "return": {
     "title": "Return Trailer",

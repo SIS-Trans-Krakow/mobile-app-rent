@@ -502,6 +502,14 @@ export default function ReturnScreen() {
           visible={!!capturePosition}
           onClose={() => setCapturePosition(null)}
           onSave={handlePhotoSave}
+          onDelete={() => {
+            setReturnPhotos((prev) => {
+              const next = { ...prev };
+              delete next[capturePosition];
+              return next;
+            });
+            setCapturePosition(null);
+          }}
           existingPhoto={returnPhotos[capturePosition]}
           showIssueFields
           originalPhoto={originalPhotos[capturePosition]}

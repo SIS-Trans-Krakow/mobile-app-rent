@@ -31,13 +31,14 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   onSave: (photo: ZonePhoto) => void;
+  onDelete?: () => void;
   existingPhoto?: ZonePhoto;
   showIssueFields?: boolean;
   originalPhoto?: ZonePhoto;
 }
 
 export default function PhotoCapture({
-  position, visible, onClose, onSave, existingPhoto, showIssueFields, originalPhoto,
+  position, visible, onClose, onSave, onDelete, existingPhoto, showIssueFields, originalPhoto,
 }: Props) {
   const { t } = useTranslation();
   const hasOriginalIssue = !!originalPhoto?.hasIssue;
@@ -74,6 +75,21 @@ export default function PhotoCapture({
   const [hasIssue, setHasIssue] = useState(buildInitialState().hasIssue);
   const [issueDescription, setIssueDescription] = useState(buildInitialState().issueDescription);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const handleDeletePhoto = () => {
+    showPlatformAlert(
+      t('photos.deletePhotoTitle'),
+      t('photos.deletePhotoConfirm'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('photos.deletePhoto'),
+          style: 'destructive',
+          onPress: () => setUri(''),
+        },
+      ]
+    );
+  };
 
   const showError = (message: string) => {
     setErrorMessage(message);
@@ -120,6 +136,11 @@ export default function PhotoCapture({
 
   const handleSave = () => {
     if (!uri) {
+      if (existingPhoto && onDelete) {
+        onDelete();
+        onClose();
+        return;
+      }
       showError(t('photos.takePhoto'));
       return;
     }
@@ -156,6 +177,7 @@ export default function PhotoCapture({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
+      <View style={styles.outerContainer}>
       <View style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity
@@ -235,6 +257,18 @@ export default function PhotoCapture({
             <Ionicons name="images" size={22} color={Colors.white} />
             <Text style={styles.actionText}>{t('photos.pickFromGallery')}</Text>
           </TouchableOpacity>
+          {uri ? (
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.deleteBtn]}
+              onPress={handleDeletePhoto}
+              accessibilityRole="button"
+              accessible
+              accessibilityLabel={t('photos.deletePhoto')}
+            >
+              <Ionicons name="trash" size={22} color={Colors.white} />
+              <Text style={styles.actionText}>{t('photos.deletePhoto')}</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
 
         <TextInput
@@ -275,12 +309,36 @@ export default function PhotoCapture({
         )}
         </ScrollContainer>
       </View>
+      </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
+  outerContainer: {
+    flex: 1,
+    ...Platform.select({
+      web: {
+        alignItems: 'center' as const,
+        justifyContent: 'center' as const,
+        backgroundColor: 'rgba(0,0,0,0.45)',
+      },
+      default: {},
+    }),
+  },
+  container: {
+    backgroundColor: Colors.background,
+    ...Platform.select({
+      web: {
+        width: '100%' as any,
+        maxWidth: 560,
+        maxHeight: '92%' as any,
+        borderRadius: 14,
+        overflow: 'hidden' as const,
+      },
+      default: { flex: 1 },
+    }),
+  },
   scrollArea: { flex: 1 },
   scrollContent: { paddingBottom: Spacing.xl },
   header: {
@@ -337,13 +395,13 @@ const styles = StyleSheet.create({
   photoSection: { alignItems: 'center', padding: Spacing.md },
   preview: {
     width: '100%',
-    height: 220,
+    aspectRatio: 4 / 3,
     borderRadius: BorderRadius.md,
     resizeMode: 'cover',
   },
   placeholder: {
     width: '100%',
-    height: 220,
+    aspectRatio: 4 / 3,
     borderRadius: BorderRadius.md,
     borderWidth: 2,
     borderColor: Colors.gray300,
@@ -368,6 +426,7 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
   },
   actionText: { color: Colors.white, fontSize: FontSize.sm, fontWeight: '600' },
+  deleteBtn: { backgroundColor: Colors.danger },
   input: {
     margin: Spacing.md,
     padding: Spacing.md,

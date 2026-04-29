@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, Image, StyleSheet, ScrollView, ViewStyle } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, Image, StyleSheet, ScrollView, ViewStyle, Platform } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle, Line, Rect } from 'react-native-svg';
@@ -34,7 +34,16 @@ interface Props {
   onZonePress: (position: PhotoPosition) => void;
   readOnly?: boolean;
   onPhotoPress?: (photo: ZonePhoto) => void;
+  /**
+   * Web-only. Fired when an image file is dropped onto a zone via native
+   * HTML5 drag-and-drop (e.g. from the user's computer). The provided URI
+   * is a `blob:` object URL that can be uploaded the same way as a picture
+   * coming from the gallery picker.
+   */
+  onZoneDrop?: (position: PhotoPosition, uri: string, file: File) => void;
 }
+
+const isWeb = Platform.OS === 'web';
 
 const POSITION_LABELS: Record<PhotoPosition, string> = {
   'front': 'photos.front',
@@ -70,8 +79,38 @@ const ZONE_LAYOUTS: Record<PhotoPosition, ViewStyle> = {
   'rear': { left: '31%', bottom: '5%', width: '38%', height: '7.5%' },
 };
 
-export default function TrailerTemplate({ photos, onZonePress, readOnly, onPhotoPress }: Props) {
+export default function TrailerTemplate({ photos, onZonePress, readOnly, onPhotoPress, onZoneDrop }: Props) {
   const { t } = useTranslation();
+  const dropEnabled = isWeb && !readOnly && !!onZoneDrop;
+  const [dragOverZone, setDragOverZone] = useState<PhotoPosition | null>(null);
+
+  // Web-only: block the browser's default file-drop behaviour (which would
+  // navigate away from the app) for files dropped anywhere on the page while
+  // this template is mounted. Drops on a zone are still handled normally —
+  // those handlers also call preventDefault, so this is just a safety net for
+  // misses outside the zones.
+  useEffect(() => {
+    if (!dropEnabled) return;
+    const isFileDrag = (e: DragEvent) => {
+      const types = e.dataTransfer?.types;
+      if (!types) return false;
+      return Array.from(types).includes('Files');
+    };
+    const onWindowDragOver = (e: DragEvent) => {
+      if (!isFileDrag(e)) return;
+      e.preventDefault();
+    };
+    const onWindowDrop = (e: DragEvent) => {
+      if (!isFileDrag(e)) return;
+      e.preventDefault();
+    };
+    window.addEventListener('dragover', onWindowDragOver);
+    window.addEventListener('drop', onWindowDrop);
+    return () => {
+      window.removeEventListener('dragover', onWindowDragOver);
+      window.removeEventListener('drop', onWindowDrop);
+    };
+  }, [dropEnabled]);
 
   const renderZone = (position: PhotoPosition, style?: ViewStyle) => {
     const photo = photos[position];
@@ -79,6 +118,7 @@ export default function TrailerTemplate({ photos, onZonePress, readOnly, onPhoto
     const hasIssue = photo?.hasIssue;
     const isPreloaded = photo?.isPreloaded;
     const isRequired = REQUIRED_POSITIONS.includes(position);
+    const isDropTarget = dragOverZone === position;
 
     const handlePress = () => {
       if (readOnly) {
@@ -91,16 +131,16 @@ export default function TrailerTemplate({ photos, onZonePress, readOnly, onPhoto
     const zoneLabel = t(POSITION_LABELS[position]);
     const zoneA11yLabel = readOnly ? zoneLabel : `${zoneLabel}. ${t('photos.tapZone')}`;
 
-    return (
+    const touchable = (
       <TouchableOpacity
-        key={position}
         style={[
           styles.zone,
           isRequired && !hasPhoto && styles.zoneRequired,
           hasPhoto && styles.zoneWithPhoto,
           hasIssue && styles.zoneWithIssue,
           isPreloaded && !hasIssue && styles.zonePreloaded,
-          style,
+          isDropTarget && styles.zoneDropActive,
+          dropEnabled ? styles.zoneFill : style,
         ]}
         onPress={handlePress}
         disabled={readOnly && !hasPhoto}
@@ -130,6 +170,56 @@ export default function TrailerTemplate({ photos, onZonePress, readOnly, onPhoto
         )}
       </TouchableOpacity>
     );
+
+    if (!dropEnabled) {
+      return React.cloneElement(touchable, { key: position });
+    }
+
+    // Web-only: wrap the zone in a native <div> because react-native-web's <View>
+    // does NOT forward HTML5 drag/drop events (onDragOver/onDrop/onDragEnter/
+    // onDragLeave are not in the View's forwarded prop list). A real DOM <div>
+    // accepts them natively. The TouchableOpacity inside fills the wrapper, so
+    // positioning (left/top/width/height) lives on the div and interactivity
+    // (tap-to-open-modal) stays on the TouchableOpacity.
+    const wrapperStyle: React.CSSProperties = {
+      position: 'absolute',
+      ...(style as React.CSSProperties),
+    };
+
+    return React.createElement(
+      'div',
+      {
+        key: position,
+        style: wrapperStyle,
+        onDragOver: (e: React.DragEvent<HTMLDivElement>) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+        },
+        onDragEnter: (e: React.DragEvent<HTMLDivElement>) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const types = e.dataTransfer?.types;
+          if (types && !Array.from(types).includes('Files')) return;
+          setDragOverZone(position);
+        },
+        onDragLeave: (e: React.DragEvent<HTMLDivElement>) => {
+          const next = e.relatedTarget as Node | null;
+          if (next && (e.currentTarget as Node).contains?.(next)) return;
+          setDragOverZone(prev => (prev === position ? null : prev));
+        },
+        onDrop: (e: React.DragEvent<HTMLDivElement>) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setDragOverZone(prev => (prev === position ? null : prev));
+          const file: File | undefined = e.dataTransfer?.files?.[0];
+          if (!file || !file.type.startsWith('image/')) return;
+          const url = URL.createObjectURL(file);
+          onZoneDrop?.(position, url, file);
+        },
+      },
+      touchable
+    );
   };
 
   return (
@@ -139,6 +229,9 @@ export default function TrailerTemplate({ photos, onZonePress, readOnly, onPhoto
       </Text>
       {!readOnly && (
         <Text style={styles.requiredHint}>* {t('photos.requiredMarker')}</Text>
+      )}
+      {dropEnabled && (
+        <Text style={styles.dropHint}>{t('photos.dragDropHint')}</Text>
       )}
 
       <View style={styles.trailer}>
@@ -301,6 +394,24 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.92)',
     overflow: 'hidden',
     paddingHorizontal: 4,
+  },
+  zoneFill: {
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  zoneDropActive: {
+    borderColor: Colors.primary,
+    borderStyle: 'solid',
+    backgroundColor: '#dbeafe',
+  },
+  dropHint: {
+    textAlign: 'center',
+    color: Colors.textSecondary,
+    fontSize: FontSize.xs,
+    fontStyle: 'italic',
+    marginBottom: Spacing.sm,
   },
   zoneWithPhoto: {
     borderColor: Colors.success,

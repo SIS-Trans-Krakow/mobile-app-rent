@@ -331,6 +331,24 @@ export default function NewHandoverScreen() {
     setCapturePosition(position);
   };
 
+  const handleZoneDrop = (position: PhotoPosition, uri: string) => {
+    setPhotos((prev) => {
+      const existing = prev[position];
+      return {
+        ...prev,
+        [position]: {
+          uri,
+          position,
+          description: existing?.description || '',
+          hasIssue: existing?.hasIssue,
+          issueDescription: existing?.issueDescription,
+          isPreloaded: false,
+          preloadedFilePath: undefined,
+        },
+      };
+    });
+  };
+
   const handlePhotoSave = (photo: ZonePhoto) => {
     setPhotos((prev) => ({
       ...prev,
@@ -799,6 +817,7 @@ export default function NewHandoverScreen() {
       <TrailerTemplate
         photos={photos}
         onZonePress={handleZonePress}
+        onZoneDrop={handleZoneDrop}
       />
     </View>
   );

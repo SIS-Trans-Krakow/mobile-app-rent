@@ -87,6 +87,30 @@ export default function ReturnScreen() {
     setCapturePosition(position);
   };
 
+  const handleZoneDrop = (position: PhotoPosition, uri: string) => {
+    setReturnPhotos((prev) => {
+      const existing = prev[position];
+      const original = originalPhotos[position];
+      // Preserve any inherited issue from the original handover photo so the
+      // user doesn't lose existing damage info just by dropping a return shot.
+      // New issues still need to be added explicitly via the modal.
+      const hasInheritedIssue = !!original?.hasIssue;
+      return {
+        ...prev,
+        [position]: {
+          uri,
+          position,
+          description: existing?.description || '',
+          hasIssue: existing?.hasIssue ?? hasInheritedIssue,
+          hasNewIssue: existing?.hasNewIssue,
+          issueDescription: existing?.issueDescription
+            ?? (hasInheritedIssue ? original?.issueDescription : ''),
+          newIssueDescription: existing?.newIssueDescription,
+        },
+      };
+    });
+  };
+
   const handlePhotoSave = (photo: ZonePhoto) => {
     setReturnPhotos((prev) => ({ ...prev, [photo.position]: photo }));
   };
@@ -457,6 +481,7 @@ export default function ReturnScreen() {
       <TrailerTemplate
         photos={returnPhotos}
         onZonePress={handleZonePress}
+        onZoneDrop={handleZoneDrop}
       />
 
       <View style={{ marginTop: Spacing.md }}>

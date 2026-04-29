@@ -150,6 +150,7 @@
     "pickFromGallery": "Gallery",
     "description": "Photo description",
     "tapZone": "Tap a zone on the template to add a photo",
+    "dragDropHint": "You can also drag a picture from your computer directly onto a zone",
     "requiredMarker": "required photo",
     "inheritedFromLastReturn": "↩ from last return",
     "inheritedIssue": "Inherited issue",

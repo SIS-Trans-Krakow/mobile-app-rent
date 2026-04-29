@@ -150,6 +150,7 @@
     "pickFromGallery": "Galeria",
     "description": "Opis zdjęcia",
     "tapZone": "Dotknij strefę na szablonie aby dodać zdjęcie",
+    "dragDropHint": "Możesz też przeciągnąć zdjęcie z komputera bezpośrednio na pole",
     "requiredMarker": "zdjęcie obowiązkowe",
     "inheritedFromLastReturn": "↩ z ostatniego zwrotu",
     "inheritedIssue": "Uszkodzenie odziedziczone",

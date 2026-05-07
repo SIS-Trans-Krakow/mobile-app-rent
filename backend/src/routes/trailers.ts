@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { getDb, VALID_TRAILER_TYPES } from '../database/schema';
 import { authenticate, requireAdmin } from '../middleware/auth';
 import { Trailer } from '../types';
+import { parseTrailersCsv } from '../utils/trailerCsv';
 
 const router = Router();
 router.use(authenticate);
@@ -74,6 +75,56 @@ router.get('/:id/last-return-photos', (req: Request, res: Response) => {
   ).all(lastReturn.id);
 
   res.json({ photos, return_date: lastReturn.return_date });
+});
+
+router.post('/import', requireAdmin, (req: Request, res: Response) => {
+  try {
+    const { csv } = req.body || {};
+    if (typeof csv !== 'string' || !csv.trim()) {
+      res.status(400).json({ error: 'CSV content is required' });
+      return;
+    }
+
+    const { rows, errors: parseErrors } = parseTrailersCsv(csv);
+
+    const db = getDb();
+    const findExisting = db.prepare(
+      'SELECT id FROM trailers WHERE UPPER(TRIM(registration_number)) = UPPER(TRIM(?))'
+    );
+    const insert = db.prepare(
+      'INSERT INTO trailers (registration_number, vin, brand, type, production_date) VALUES (?, ?, ?, ?, ?)'
+    );
+
+    let imported = 0;
+    let skipped = 0;
+    const skippedRows: Array<{ registration_number: string; reason: string }> = [];
+
+    const txn = db.transaction(() => {
+      for (const row of rows) {
+        const reg = row.registration_number.trim();
+        const existing = findExisting.get(reg);
+        if (existing) {
+          skipped++;
+          skippedRows.push({ registration_number: reg, reason: 'duplicate' });
+          continue;
+        }
+        insert.run(reg, row.vin || '', row.brand || '', row.type, row.production_date || '');
+        imported++;
+      }
+    });
+    txn();
+
+    res.json({
+      imported,
+      skipped,
+      total: rows.length + parseErrors.length,
+      parse_errors: parseErrors,
+      skipped_rows: skippedRows,
+    });
+  } catch (err) {
+    console.error('Import trailers error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 router.post('/', requireAdmin, (req: Request, res: Response) => {

@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList,
-  Alert, ActivityIndicator, Modal, Platform,
+  Alert, ActivityIndicator, Modal, Platform, ScrollView,
 } from 'react-native';
 import { KeyboardAwareScrollView } from '../../../utils/keyboardController';
 
@@ -9,8 +9,18 @@ const ScrollContainer: React.ComponentType<any> = KeyboardAwareScrollView;
 import { useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
 import api from '../../../services/api';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../../constants/theme';
+
+interface ImportResult {
+  imported: number;
+  skipped: number;
+  total: number;
+  parse_errors: Array<{ line: number; raw: string; reason: string }>;
+  skipped_rows: Array<{ registration_number: string; reason: string }>;
+}
 
 const TRAILER_TYPES = ['Kurtyna', 'Box', 'Izoterma', 'Chłodnia', 'Kurtyna MEGA', 'TANDEM', 'Double Deck'] as const;
 
@@ -39,6 +49,10 @@ export default function TrailersScreen() {
   const [formBrand, setFormBrand] = useState('');
   const [formType, setFormType] = useState<string>(TRAILER_TYPES[0]);
   const [formProductionDate, setFormProductionDate] = useState('');
+
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [importModalVisible, setImportModalVisible] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -162,6 +176,53 @@ export default function TrailersScreen() {
     }
   };
 
+  const readPickedCsvAsText = async (
+    asset: DocumentPicker.DocumentPickerAsset
+  ): Promise<string> => {
+    if (Platform.OS === 'web' && asset.file) {
+      return asset.file.text();
+    }
+    // expo-file-system v19+ exposes a File class with an async text() reader.
+    const { File } = await import('expo-file-system');
+    return new File(asset.uri).text();
+  };
+
+  const handleImportCsv = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['text/csv', 'text/comma-separated-values', 'application/csv', 'text/plain', '*/*'],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+
+      if (result.canceled) return;
+
+      const asset = result.assets?.[0];
+      if (!asset) return;
+
+      setImporting(true);
+      const csv = await readPickedCsvAsText(asset);
+
+      if (!csv.trim()) {
+        showAlert(t('common.error'), t('admin.importEmptyFile'));
+        return;
+      }
+
+      const res = await api.post<ImportResult>('/trailers/import', { csv });
+      setImportResult(res.data);
+      setImportModalVisible(true);
+      loadTrailers();
+    } catch (err: any) {
+      console.error('Import CSV error:', err);
+      showAlert(
+        t('common.error'),
+        err?.response?.data?.error || err?.message || t('admin.importError')
+      );
+    } finally {
+      setImporting(false);
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -233,6 +294,19 @@ export default function TrailersScreen() {
           <Text style={styles.emptyText}>{t('common.noData')}</Text>
         }
       />
+
+      <TouchableOpacity
+        style={[styles.fab, styles.fabImport]}
+        onPress={handleImportCsv}
+        disabled={importing}
+        accessibilityLabel={t('admin.importCsv')}
+      >
+        {importing ? (
+          <ActivityIndicator color={Colors.white} />
+        ) : (
+          <Ionicons name="cloud-upload-outline" size={24} color={Colors.white} />
+        )}
+      </TouchableOpacity>
 
       <TouchableOpacity style={styles.fab} onPress={openCreateModal}>
         <Ionicons name="add" size={28} color={Colors.white} />
@@ -314,6 +388,79 @@ export default function TrailersScreen() {
               )}
             </TouchableOpacity>
           </ScrollContainer>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={importModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setImportModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setImportModalVisible(false)}>
+              <Ionicons name="close" size={28} color={Colors.text} />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>{t('admin.importResultTitle')}</Text>
+            <View style={{ width: 28 }} />
+          </View>
+
+          <ScrollView style={styles.modalBody} contentContainerStyle={{ paddingBottom: Spacing.xxl }}>
+            {importResult && (
+              <>
+                <View style={styles.summaryRow}>
+                  <View style={[styles.summaryBox, { backgroundColor: '#ecfdf5' }]}>
+                    <Text style={[styles.summaryNumber, { color: Colors.success }]}>
+                      {importResult.imported}
+                    </Text>
+                    <Text style={styles.summaryLabel}>{t('admin.importImported')}</Text>
+                  </View>
+                  <View style={[styles.summaryBox, { backgroundColor: '#fef3c7' }]}>
+                    <Text style={[styles.summaryNumber, { color: '#b45309' }]}>
+                      {importResult.skipped}
+                    </Text>
+                    <Text style={styles.summaryLabel}>{t('admin.importSkipped')}</Text>
+                  </View>
+                  <View style={[styles.summaryBox, { backgroundColor: '#fee2e2' }]}>
+                    <Text style={[styles.summaryNumber, { color: Colors.danger }]}>
+                      {importResult.parse_errors.length}
+                    </Text>
+                    <Text style={styles.summaryLabel}>{t('admin.importErrors')}</Text>
+                  </View>
+                </View>
+
+                {importResult.skipped_rows.length > 0 && (
+                  <>
+                    <Text style={styles.sectionHeader}>{t('admin.importSkippedSection')}</Text>
+                    {importResult.skipped_rows.map((row, idx) => (
+                      <View key={`skipped-${idx}`} style={styles.errorRow}>
+                        <Text style={styles.errorRegNumber}>{row.registration_number}</Text>
+                        <Text style={styles.errorReason}>{t('admin.importDuplicate')}</Text>
+                      </View>
+                    ))}
+                  </>
+                )}
+
+                {importResult.parse_errors.length > 0 && (
+                  <>
+                    <Text style={styles.sectionHeader}>{t('admin.importErrorsSection')}</Text>
+                    {importResult.parse_errors.map((err, idx) => (
+                      <View key={`err-${idx}`} style={styles.errorRow}>
+                        <Text style={styles.errorRegNumber}>
+                          {t('admin.importLine')} {err.line}
+                        </Text>
+                        <Text style={styles.errorReason}>{err.reason}</Text>
+                        <Text style={styles.errorRaw}>{err.raw}</Text>
+                      </View>
+                    ))}
+                  </>
+                )}
+
+                <Text style={styles.formatHint}>{t('admin.importFormatHint')}</Text>
+              </>
+            )}
+          </ScrollView>
         </View>
       </Modal>
     </View>
@@ -404,6 +551,54 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 6,
+  },
+  fabImport: {
+    right: Spacing.lg + 56 + Spacing.md,
+    backgroundColor: Colors.primary,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginBottom: Spacing.lg,
+  },
+  summaryBox: {
+    flex: 1,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+  },
+  summaryNumber: { fontSize: FontSize.xl, fontWeight: '700' },
+  summaryLabel: {
+    fontSize: FontSize.xs,
+    color: Colors.gray700,
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  sectionHeader: {
+    fontSize: FontSize.md,
+    fontWeight: '600',
+    color: Colors.text,
+    marginTop: Spacing.lg,
+    marginBottom: Spacing.sm,
+  },
+  errorRow: {
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.sm,
+    padding: Spacing.sm,
+    marginBottom: Spacing.xs,
+  },
+  errorRegNumber: { fontSize: FontSize.sm, fontWeight: '600', color: Colors.text },
+  errorReason: { fontSize: FontSize.xs, color: Colors.danger, marginTop: 2 },
+  errorRaw: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
+  formatHint: {
+    marginTop: Spacing.lg,
+    padding: Spacing.md,
+    backgroundColor: '#eff6ff',
+    borderRadius: BorderRadius.sm,
+    fontSize: FontSize.xs,
+    color: Colors.gray700,
   },
   modalContainer: { flex: 1, backgroundColor: Colors.background },
   modalHeader: {

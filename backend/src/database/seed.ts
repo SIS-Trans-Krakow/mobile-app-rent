@@ -1,19 +1,8 @@
 import bcrypt from 'bcrypt';
 import fs from 'fs';
 import path from 'path';
-import { getDb, VALID_TRAILER_TYPES } from './schema';
-
-const TYPE_NORMALIZE: Record<string, string> = {
-  'BOX': 'Box',
-  'Box': 'Box',
-  'Kurtyna': 'Kurtyna',
-  'Kurtyna MEGA': 'Kurtyna MEGA',
-  'CHŁODNIA': 'Chłodnia',
-  'Chłodnia': 'Chłodnia',
-  'Izoterma': 'Izoterma',
-  'TANDEM': 'TANDEM',
-  'Double Deck': 'Double Deck',
-};
+import { getDb } from './schema';
+import { parseTrailersCsv } from '../utils/trailerCsv';
 
 export async function seedDefaultAdmin(): Promise<void> {
   const db = getDb();
@@ -46,7 +35,11 @@ export function seedTrailersFromCsv(): void {
 
   console.log('[seed] Seeding trailers from CSV...');
   const csv = fs.readFileSync(csvPath, 'utf-8');
-  const lines = csv.split('\n').slice(1).filter((l) => l.trim());
+  const { rows, errors } = parseTrailersCsv(csv);
+
+  for (const err of errors) {
+    console.warn(`[seed] Skipping invalid row (line ${err.line}): ${err.reason}`);
+  }
 
   const insert = db.prepare(
     'INSERT OR IGNORE INTO trailers (registration_number, vin, brand, type, production_date) VALUES (?, ?, ?, ?, ?)'
@@ -54,24 +47,15 @@ export function seedTrailersFromCsv(): void {
 
   const insertAll = db.transaction(() => {
     let imported = 0;
-    for (const line of lines) {
-      const parts = line.split(',').map((s) => s.trim());
-      if (parts.length < 5) continue;
-
-      const regNum = parts[0];
-      const vin = parts[1];
-      const productionDate = parts[2] || '';
-      const brand = parts[3];
-      const rawType = parts.slice(4).join(',').trim();
-      const normalizedType = TYPE_NORMALIZE[rawType];
-
-      if (!regNum || !normalizedType) {
-        console.warn(`[seed] Skipping invalid row: ${line.substring(0, 60)}`);
-        continue;
-      }
-
-      insert.run(regNum, vin, brand, normalizedType, productionDate);
-      imported++;
+    for (const row of rows) {
+      const result = insert.run(
+        row.registration_number,
+        row.vin,
+        row.brand,
+        row.type,
+        row.production_date,
+      );
+      if (result.changes > 0) imported++;
     }
     console.log(`[seed] Imported ${imported} trailers.`);
   });

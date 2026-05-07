@@ -287,6 +287,18 @@
     "manageTrailers": "Manage Trailers",
     "manageUsersDesc": "Create, edit and delete user accounts",
     "manageClientsDesc": "Search, add and edit clients",
-    "manageTrailersDesc": "Add, edit and delete trailers from database"
+    "manageTrailersDesc": "Add, edit and delete trailers from database",
+    "importCsv": "Import CSV",
+    "importEmptyFile": "Selected file is empty",
+    "importError": "Failed to import CSV file",
+    "importResultTitle": "Import Result",
+    "importImported": "Imported",
+    "importSkipped": "Skipped",
+    "importErrors": "Errors",
+    "importSkippedSection": "Skipped (already exist)",
+    "importErrorsSection": "Rows with errors",
+    "importDuplicate": "Trailer with this registration number already exists",
+    "importLine": "Line",
+    "importFormatHint": "CSV format: Registration Number, VIN, Year, Brand, Type. Header row is optional. Supported types: BOX, Kurtyna, Kurtyna MEGA, Chłodnia, Izoterma, TANDEM, Double Deck."
   }
 }

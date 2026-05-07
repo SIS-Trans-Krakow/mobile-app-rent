@@ -16,6 +16,57 @@ function getIssuerSnapshotForPdf(record: any) {
   };
 }
 
+const POLISH_DIACRITIC_MAP: Record<string, string> = {
+  ą: 'a', Ą: 'A', ć: 'c', Ć: 'C', ę: 'e', Ę: 'E',
+  ł: 'l', Ł: 'L', ń: 'n', Ń: 'N', ó: 'o', Ó: 'O',
+  ś: 's', Ś: 'S', ź: 'z', Ź: 'Z', ż: 'z', Ż: 'Z',
+};
+
+function sanitizeFilenamePart(value: unknown): string {
+  const raw = (value === null || value === undefined ? '' : String(value)).trim();
+  if (!raw) return 'brak';
+  const normalized = raw.replace(/[ąĄćĆęĘłŁńŃóÓśŚźŹżŻ]/g, (ch) => POLISH_DIACRITIC_MAP[ch] || ch);
+  const cleaned = normalized
+    .replace(/[^A-Za-z0-9._-]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^[_.-]+|[_.-]+$/g, '');
+  return cleaned || 'brak';
+}
+
+function extractClientName(value: unknown): string {
+  const raw = (value === null || value === undefined ? '' : String(value)).trim();
+  if (!raw) return '';
+  const firstChunk = raw.split(/[\n\r,;|/]+/, 1)[0]?.trim() ?? '';
+  const beforeAddress = firstChunk.split(
+    /\s+(?:ul\.?|ulica|al\.?|aleja|pl\.?|plac|os\.?|osiedle|skr\.?|\d{2}-\d{3})\b/i
+  )[0]?.trim() ?? '';
+  return beforeAddress || firstChunk || raw;
+}
+
+function buildPdfFilename(parts: {
+  registration: unknown;
+  client: unknown;
+  protocolNumber: unknown;
+  type: 'przekazanie' | 'zwrot';
+}): { ascii: string; utf8: string } {
+  const clientName = extractClientName(parts.client);
+  const reg = sanitizeFilenamePart(parts.registration);
+  const client = sanitizeFilenamePart(clientName);
+  const num = sanitizeFilenamePart(parts.protocolNumber);
+  const ascii = `${reg}_${client}_${num}_${parts.type}.pdf`;
+  const utf8 = `${String(parts.registration ?? '').trim() || 'brak'}_${clientName || 'brak'}_${String(parts.protocolNumber ?? '').trim() || 'brak'}_${parts.type}.pdf`;
+  return { ascii, utf8 };
+}
+
+function setPdfDisposition(res: Response, filename: { ascii: string; utf8: string }): void {
+  const asciiQuoted = filename.ascii.replace(/"/g, '');
+  const utf8Encoded = encodeURIComponent(filename.utf8).replace(/['()]/g, escape);
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="${asciiQuoted}"; filename*=UTF-8''${utf8Encoded}`
+  );
+}
+
 router.get('/handover/:id', (req: Request, res: Response) => {
   const db = getDb();
   const handover = db.prepare(`
@@ -51,7 +102,12 @@ router.get('/handover/:id', (req: Request, res: Response) => {
     handover.photos = handoverPhotos;
 
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=zwrot_${returnRecord.id}.pdf`);
+    setPdfDisposition(res, buildPdfFilename({
+      registration: handover.registration_number,
+      client: handover.company_name,
+      protocolNumber: returnRecord.id,
+      type: 'zwrot',
+    }));
 
     const returnDoc = generateReturnPdf(handover, returnRecord, getIssuerSnapshotForPdf(returnRecord));
     returnDoc.pipe(res);
@@ -66,7 +122,12 @@ router.get('/handover/:id', (req: Request, res: Response) => {
   handover.photos = photos;
 
   res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename=przekazanie_${handover.id}.pdf`);
+  setPdfDisposition(res, buildPdfFilename({
+    registration: handover.registration_number,
+    client: handover.company_name,
+    protocolNumber: handover.id,
+    type: 'przekazanie',
+  }));
 
   const doc = generateHandoverPdf(handover, getIssuerSnapshotForPdf(handover));
   doc.pipe(res);
@@ -107,7 +168,12 @@ router.get('/return/:id', (req: Request, res: Response) => {
   handover.photos = handoverPhotos;
 
   res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename=zwrot_${returnRecord.id}.pdf`);
+  setPdfDisposition(res, buildPdfFilename({
+    registration: handover.registration_number,
+    client: handover.company_name,
+    protocolNumber: returnRecord.id,
+    type: 'zwrot',
+  }));
 
   const doc = generateReturnPdf(handover, returnRecord, getIssuerSnapshotForPdf(returnRecord));
   doc.pipe(res);

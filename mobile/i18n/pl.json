@@ -289,6 +289,18 @@
     "manageTrailers": "Zarządzaj naczepami",
     "manageUsersDesc": "Tworzenie, edycja i usuwanie kont użytkowników",
     "manageClientsDesc": "Wyszukiwanie, dodawanie i edycja klientów",
-    "manageTrailersDesc": "Dodawanie, edycja i usuwanie naczep z bazy"
+    "manageTrailersDesc": "Dodawanie, edycja i usuwanie naczep z bazy",
+    "importCsv": "Import CSV",
+    "importEmptyFile": "Wybrany plik jest pusty",
+    "importError": "Nie udało się zaimportować pliku CSV",
+    "importResultTitle": "Wynik importu",
+    "importImported": "Zaimportowano",
+    "importSkipped": "Pominięto",
+    "importErrors": "Błędy",
+    "importSkippedSection": "Pominięte (już istnieją)",
+    "importErrorsSection": "Wiersze z błędami",
+    "importDuplicate": "Naczepa o tym numerze rejestracyjnym już istnieje",
+    "importLine": "Wiersz",
+    "importFormatHint": "Format pliku CSV: Numer Rejestracyjny, VIN, rocznik, MARKA, TYP. Pierwszy wiersz z nagłówkami jest opcjonalny. Obsługiwane typy: BOX, Kurtyna, Kurtyna MEGA, Chłodnia, Izoterma, TANDEM, Double Deck."
   }
 }
